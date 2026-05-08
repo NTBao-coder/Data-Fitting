@@ -9,6 +9,7 @@ import numpy as np
 
 
 ModelType = Literal["ols", "ridge", "lasso"]
+DEFAULT_LASSO_MAX_ITER = 2000
 
 
 @dataclass(frozen=True)
@@ -71,7 +72,7 @@ class LinearModels:
         X: np.ndarray,
         y: np.ndarray,
         alpha: float,
-        max_iter: int = 2000,
+        max_iter: int = DEFAULT_LASSO_MAX_ITER,
         tol: float = 1e-6,
     ) -> np.ndarray:
         if alpha < 0:

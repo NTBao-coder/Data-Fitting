@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+DEFAULT_MISSING_CATEGORY = "missing"
+
 
 @dataclass
 class DataPipeline:
@@ -47,7 +49,11 @@ class DataPipeline:
                 for v in X[:, idx]
                 if v is not None and str(v).strip() != ""
             ]
-            mode_value = Counter(values).most_common(1)[0][0] if values else "missing"
+            mode_value = (
+                Counter(values).most_common(1)[0][0]
+                if values
+                else DEFAULT_MISSING_CATEGORY
+            )
             self._categorical_impute[idx] = mode_value
             filled_values = [
                 str(v).strip() if v is not None and str(v).strip() != "" else mode_value
