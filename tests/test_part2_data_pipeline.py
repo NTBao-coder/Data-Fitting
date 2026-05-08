@@ -28,7 +28,7 @@ class TestDataPipeline(unittest.TestCase):
     def test_fit_transform_produces_expected_width(self) -> None:
         transformed = self.pipeline.fit_transform(self.X_train)
         self.assertEqual(transformed.shape[0], self.X_train.shape[0])
-        self.assertEqual(transformed.shape[1], 2 + 2)  # 2 numeric + 2 categories (A, B)
+        self.assertEqual(transformed.shape[1], 2 + 2)  # 2 numeric + encoded categories A and B
 
     def test_transform_uses_train_statistics_without_leakage(self) -> None:
         self.pipeline.fit(self.X_train)
