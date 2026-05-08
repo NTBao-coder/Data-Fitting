@@ -41,7 +41,11 @@ class TestDataPipeline(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self.pipeline.transform(self.X_test)
 
+    def test_empty_feature_configuration_returns_empty_matrix(self) -> None:
+        pipeline = DataPipeline(numeric_indices=(), categorical_indices=())
+        transformed = pipeline.fit_transform(self.X_train)
+        self.assertEqual(transformed.shape, (self.X_train.shape[0], 0))
+
 
 if __name__ == "__main__":
     unittest.main()
-
