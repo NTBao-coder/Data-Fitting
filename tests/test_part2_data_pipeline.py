@@ -6,6 +6,8 @@ from Group_01.part2.data_pipeline import DataPipeline
 
 
 class TestDataPipeline(unittest.TestCase):
+    EXPECTED_TRANSFORMED_COLUMNS = 4
+
     def setUp(self) -> None:
         self.X_train = np.array(
             [
@@ -28,12 +30,15 @@ class TestDataPipeline(unittest.TestCase):
     def test_fit_transform_produces_expected_width(self) -> None:
         transformed = self.pipeline.fit_transform(self.X_train)
         self.assertEqual(transformed.shape[0], self.X_train.shape[0])
-        self.assertEqual(transformed.shape[1], 2 + 2)  # empty strings are imputed, so categories remain A and B
+        self.assertEqual(
+            transformed.shape[1],
+            self.EXPECTED_TRANSFORMED_COLUMNS,  # 2 numeric features + 2 categories (A, B)
+        )
 
     def test_transform_uses_train_statistics_without_leakage(self) -> None:
         self.pipeline.fit(self.X_train)
         transformed_test = self.pipeline.transform(self.X_test)
-        self.assertEqual(transformed_test.shape[1], 4)
+        self.assertEqual(transformed_test.shape[1], self.EXPECTED_TRANSFORMED_COLUMNS)
         # unseen category C should not create new columns and should encode to zeros for category block
         np.testing.assert_array_equal(transformed_test[1, 2:], np.array([0.0, 0.0]))
 

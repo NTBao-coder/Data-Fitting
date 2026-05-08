@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -46,7 +47,7 @@ class DataPipeline:
                 for v in X[:, idx]
                 if v is not None and str(v).strip() != ""
             ]
-            mode_value = max(set(values), key=values.count) if values else "missing"
+            mode_value = Counter(values).most_common(1)[0][0] if values else "missing"
             self._categorical_impute[idx] = mode_value
             filled_values = [
                 str(v).strip() if v is not None and str(v).strip() != "" else mode_value

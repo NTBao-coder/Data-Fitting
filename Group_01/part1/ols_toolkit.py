@@ -25,9 +25,7 @@ class LinearModels:
     @staticmethod
     def _to_1d(y: np.ndarray) -> np.ndarray:
         y = np.asarray(y, dtype=float)
-        if y.ndim > 2:
-            raise ValueError("y must be 1D or 2D with shape (n, 1).")
-        if y.ndim == 2 and y.shape[1] != 1:
+        if y.ndim > 2 or (y.ndim == 2 and y.shape[1] != 1):
             raise ValueError("y must be 1D or 2D with shape (n, 1).")
         return y.reshape(-1)
 
