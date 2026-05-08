@@ -103,4 +103,3 @@ class DataPipeline:
         for idx in self.numeric_indices + self.categorical_indices:
             if idx < 0 or idx > max_idx:
                 raise ValueError("Feature index is out of bounds for X.")
-
