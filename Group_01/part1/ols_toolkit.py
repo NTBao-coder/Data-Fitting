@@ -97,7 +97,7 @@ class LinearModels:
                     beta[j] = rho_j / col_norm[j] if col_norm[j] > 0 else 0.0
                     continue
 
-                threshold = alpha / 2.0
+                threshold = alpha
                 if rho_j < -threshold:
                     beta[j] = (rho_j + threshold) / col_norm[j]
                 elif rho_j > threshold:
