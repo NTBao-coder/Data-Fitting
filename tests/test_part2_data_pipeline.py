@@ -7,6 +7,7 @@ from Group_01.part2.data_pipeline import DataPipeline
 
 class TestDataPipeline(unittest.TestCase):
     EXPECTED_TRANSFORMED_COLUMNS = 4
+    NUMERIC_FEATURE_COUNT = 2
 
     def setUp(self) -> None:
         self.X_train = np.array(
@@ -40,7 +41,11 @@ class TestDataPipeline(unittest.TestCase):
         transformed_test = self.pipeline.transform(self.X_test)
         self.assertEqual(transformed_test.shape[1], self.EXPECTED_TRANSFORMED_COLUMNS)
         # unseen category C should not create new columns and should encode to zeros for category block
-        np.testing.assert_array_equal(transformed_test[1, 2:], np.array([0.0, 0.0]))
+        category_start = self.NUMERIC_FEATURE_COUNT
+        np.testing.assert_array_equal(
+            transformed_test[1, category_start:],
+            np.zeros(self.EXPECTED_TRANSFORMED_COLUMNS - category_start),
+        )
 
     def test_transform_before_fit_raises(self) -> None:
         with self.assertRaises(RuntimeError):

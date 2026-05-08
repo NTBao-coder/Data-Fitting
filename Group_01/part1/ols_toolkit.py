@@ -71,7 +71,7 @@ class LinearModels:
         X: np.ndarray,
         y: np.ndarray,
         alpha: float,
-        max_iter: int = 2_000,
+        max_iter: int = 2000,
         tol: float = 1e-6,
     ) -> np.ndarray:
         if alpha < 0:
