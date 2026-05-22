@@ -10,25 +10,8 @@ import pandas as pd
 import seaborn as sns
 from scipy import stats
 
+from part1._utils import _as_1d_float_array, _as_2d_float_array
 from part1.ols_implementation import hat_matrix
-
-
-def _as_1d_float_array(values: np.ndarray, name: str) -> np.ndarray:
-    """Convert a vector-like input to a 1D float array."""
-    array = np.asarray(values, dtype=float)
-    if array.ndim == 2 and array.shape[1] == 1:
-        array = array.ravel()
-    if array.ndim != 1:
-        raise ValueError(f"{name} must be a 1D array or a 2D column vector.")
-    return array
-
-
-def _as_2d_float_array(values: np.ndarray, name: str) -> np.ndarray:
-    """Convert a matrix-like input to a 2D float array."""
-    array = np.asarray(values, dtype=float)
-    if array.ndim != 2:
-        raise ValueError(f"{name} must be a 2D array.")
-    return array
 
 
 def residual_plots(
@@ -167,7 +150,7 @@ def monte_carlo_gauss_markov(
     XT = np.swapaxes(X, 1, 2)
     XTX = XT @ X
     XTy = XT @ y[..., None]
-    beta_hats = (np.linalg.inv(XTX) @ XTy).squeeze(axis=2)
+    beta_hats = np.linalg.solve(XTX, XTy).squeeze(axis=2)
 
     beta_mean = beta_hats.mean(axis=0)
     beta_bias = beta_mean - true_beta

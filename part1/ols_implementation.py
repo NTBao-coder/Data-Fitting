@@ -13,23 +13,10 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-
-def _as_1d_float_array(values: np.ndarray, name: str) -> np.ndarray:
-    """Convert a vector-like input to a 1D float array."""
-    array = np.asarray(values, dtype=float)
-    if array.ndim == 2 and array.shape[1] == 1:
-        array = array.ravel()
-    if array.ndim != 1:
-        raise ValueError(f"{name} must be a 1D array or a 2D column vector.")
-    return array
+from part1._utils import _as_1d_float_array, _as_2d_float_array
 
 
-def _as_2d_float_array(values: np.ndarray, name: str) -> np.ndarray:
-    """Convert a matrix-like input to a 2D float array."""
-    array = np.asarray(values, dtype=float)
-    if array.ndim != 2:
-        raise ValueError(f"{name} must be a 2D array.")
-    return array
+
 
 
 def _validate_regression_shapes(X: np.ndarray, y: np.ndarray) -> tuple[int, int]:
@@ -69,7 +56,7 @@ def ols_fit(X: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, float]:
     n_samples, n_features = _validate_regression_shapes(X, y)
 
     XTX = X.T @ X
-    beta_hat = np.linalg.inv(XTX) @ X.T @ y
+    beta_hat = np.linalg.solve(XTX, X.T @ y)
     residuals = y - X @ beta_hat
     rss = residuals.T @ residuals
     sigma_squared = rss / (n_samples - n_features)
@@ -106,10 +93,12 @@ def hat_matrix(X: np.ndarray) -> np.ndarray:
     if n_samples < n_features:
         raise ValueError("X must have n_samples >= n_features.")
 
-    H = X @ np.linalg.inv(X.T @ X) @ X.T
+    H = X @ np.linalg.solve(X.T @ X, X.T)
 
-    assert np.allclose(H.T, H, atol=1e-8), "Hat matrix must be symmetric."
-    assert np.allclose(H @ H, H, atol=1e-8), "Hat matrix must be idempotent."
+    if not np.allclose(H.T, H, atol=1e-8):
+        raise RuntimeError("Hat matrix is not symmetric — possible numerical issue.")
+    if not np.allclose(H @ H, H, atol=1e-8):
+        raise RuntimeError("Hat matrix is not idempotent — possible numerical issue.")
 
     return H
 
@@ -221,7 +210,8 @@ def coef_inference(
         raise ValueError("sigma2 must be non-negative.")
 
     df_resid = n_samples - n_features
-    cov_beta = sigma2 * np.linalg.inv(X.T @ X)
+    XTX = X.T @ X
+    cov_beta = sigma2 * np.linalg.solve(XTX, np.eye(n_features))
     std_error = np.sqrt(np.diag(cov_beta))
     t_stat = np.divide(
         beta_hat,
