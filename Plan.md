@@ -1,105 +1,78 @@
-# 🚀 Bảng Phân Công Nhiệm Vụ Nước Rút (Sprint 2 Tuần)
+# 🚀 Kế Hoạch Kỹ Thuật Tổng Thể (Technical Execution Plan)
 
-**Môn học:** Toán Ứng Dụng và Thống Kê (Project 2 - OLS)
-**Bộ dữ liệu:** NBA Player Salaries (Kaggle + `nba_api`) - Mục tiêu: y = ln(Salary)
-**Thời gian thực hiện:** 2 Tuần (Hard Deadline).
-**Nhóm trưởng:** Bảo (Leader / Reviewer / Organizer).
-**Thành viên:** Linh, Minh, Dương, Hoàng.
-
-**Quy tắc sinh tồn:** 1. Push code mỗi ngày. Leader review PR trong vòng tối đa 12 giờ (SLA 12h).
-2. Không đợi code hoàn hảo mới mở PR, mở "Draft PR" ngay khi bắt đầu làm để Leader theo dõi tiến độ.
-3. **Daily Standup:** Mỗi ngày 18:00 (15 phút) trên nhóm chat cập nhật 3 mục: Done / Blocked / Todo.
+**Dự án:** Data Fitting và Phương Pháp OLS (Project 2)
+**Bộ dữ liệu:** NBA Player Salaries - Dự đoán mức lương dựa trên chỉ số thể chất và thi đấu.
+**Mục tiêu cốt lõi:** Cài đặt thuật toán hồi quy tuyến tính từ đầu (from scratch) bằng đại số tuyến tính, xây dựng pipeline tiền xử lý dữ liệu hướng đối tượng (OOP) và ngăn chặn tuyệt đối hiện tượng rò rỉ dữ liệu (Data Leakage).
 
 ---
 
-## 🌿 Quy Tắc Làm Việc Trên GitHub (Git Workflow)
-1. **Tuyệt đối không push trực tiếp lên nhánh `main`.**
-2. **Branch Naming:** Tạo nhánh từ `main` theo cú pháp: `<tên_thành_viên>/<tên_task>`. *(Ví dụ: `linh/ols-impl`, `duong/ridge-lasso`, `Dương/data-pipeline`, `hoang/api-scrape`)*
-3. **Môi trường:** Đảm bảo chạy trên Python 3.10+ (macOS/Unix ưu tiên). Đồng bộ các thư viện qua `requirements.txt`.
-4. **Pull Request (PR):** Phải sử dụng mẫu kiểm tra (tạo file `.github/pull_request_template.md` chứa checklist QA). Gắn tag Reviewer (Bảo), Approve mới được Merge.
+## 🛠 1. Tiêu Chuẩn Môi Trường & Luồng Làm Việc
+* **Quản lý môi trường:** Sử dụng `micromamba` để khởi tạo không gian làm việc Python 3.10+, khắc phục triệt để lỗi phân tách `PATH` trên hệ điều hành macOS (Apple Silicon).
+* **Thư viện cho phép:** `numpy`, `pandas`, `matplotlib`, `seaborn`. 
+* [cite_start]**Hạn chế thư viện:** Tuyệt đối không sử dụng `sklearn.linear_model.LinearRegression` hay `numpy.linalg.lstsq` cho các thuật toán lõi của mô hình OLS[cite: 40, 47]. Thư viện `scikit-learn` chỉ được dùng để kiểm chứng kết quả và chia tập dữ liệu.
+* [cite_start]**Tính tái lập (Reproducibility):** Cố định `random_state = 42` (hoặc seed tương tự) trong mọi thao tác chia tập Train/Test, khởi tạo K-Fold và mô phỏng Monte Carlo[cite: 352].
 
 ---
 
-## 🏁 Lịch Trình Thực Hiện (14 Ngày)
+## 🧮 2. Phần 1: Cài Đặt Toán Học & Lõi Thuật Toán (Core Implementation)
+**Mục tiêu:** Xây dựng bộ thư viện hồi quy tuyến tính nội bộ với độ chính xác ma trận tương đương với các thư viện tiêu chuẩn.
 
-### Tuần 1: Xây móng & Hoàn thiện Data Pipeline
-**Mục tiêu:** Nhóm Lý thuyết xong 80% thuật toán lõi. Nhóm Dữ liệu xuất được file CSV sạch và chạy qua class `DataPipeline`.
+### 2.1. Ordinary Least Squares (OLS) & Ma trận mũ (Hat Matrix)
+* [cite_start]**Thuật toán:** Tính toán vector hệ số $\hat{\beta} = (X^T X)^{-1} X^T y$ và ma trận chiếu $H = X(X^T X)^{-1} X^T$ bằng phép nhân ma trận `numpy` thuần túy[cite: 83, 91].
+* **Kiểm chứng:** Xác nhận tính chất lũy đẳng (idempotent) của ma trận $H$ ($H^2 = H$).
+* [cite_start]**Đo lường:** Cài đặt các hàm tính $R^2$, $\overline{R}^2$, F-statistic và t-statistic để suy diễn thống kê cho từng hệ số[cite: 117, 121, 126].
 
-| Phân công | Chi tiết công việc | File làm việc chính (Owner) |
-| :--- | :--- | :--- |
-| **Bảo (Leader)** | Setup repo + skeleton code + PR Template. Tuyệt đối không code tính năng. Tập trung Review PR liên tục. | Repo config |
-| **Linh (Toán 1)** | Code `ols_fit`, `hat_matrix`, metrics, t-stat. Tự code residual plot (3-4 biểu đồ). Nhận thêm code mô phỏng Monte Carlo E[beta_hat] = beta. | `part1/ols_implementation.py`, `part1/residual_analysis.py` |
-| **Minh (Toán 2)** | Code `vif`, `ridge_fit`, và `lasso_fit` (Coordinate Descent). Code `kfold_cv`. Tập trung hoàn thành trước ngày 7. | `part1/ridge_lasso.py`, `part1/cross_validation.py` |
-| **Hoàng (Data 1)** | Kéo `nba_api`, merge Kaggle xuất CSV tổng. Chạy EDA nhanh (Heatmap) tìm cột missing >= 5%. | `part2/data/`, `eda.ipynb` |
-| **Dương (Data 2)** | Code `DataPipeline` (phân tách fit/transform). Validate quy tắc "One Truth" với Hoàng. *(Nếu xong sớm Day 5: Giúp A code test cases cho Ridge/Lasso)*. | `part2/data_pipeline.py` |
+### 2.2. Regularization (Ridge & Lasso)
+* [cite_start]**Ridge Regression:** Thêm tham số phạt $L_2$ vào đường chéo chính: $\hat{\beta}_{ridge} = (X^T X + \lambda I)^{-1} X^T y$[cite: 145]. Vẽ đồ thị Ridge Trace để quan sát sự co rút của các hệ số.
+* [cite_start]**Lasso Regression:** Cài đặt thuật toán **Coordinate Descent** để tối ưu hóa hàm mất mát $L_1$, do Lasso không có nghiệm đóng (closed-form solution)[cite: 147, 150].
 
-### Tuần 2: Huấn luyện, Biện luận & Ghép Báo Cáo
-**Mục tiêu:** Chốt mô hình, ráp Notebook và hoàn thiện file PDF bằng LaTeX.
-
-| Phân công | Chi tiết công việc | File làm việc chính (Owner) |
-| :--- | :--- | :--- |
-| **Bảo (Leader)** | Chạy Sanity Check toàn bộ code. Kiểm tra Data Leakage chặn cuối. **Chủ trì thiết kế Trang bìa (Cover), Mục lục (TOC) và chuẩn hóa định dạng (Format) tổng thể của file LaTeX.** | Toàn bộ Repo, `report/report.tex` (Formatting) |
-| **Linh (Toán 1)** | Dịch toán học Part 1 sang LaTeX. **Chủ trì `part1_notebook.ipynb`** (demo kết quả OLS + Monte Carlo). Tự đóng góp 1-2 tài liệu tham khảo phần OLS. | `report/report.tex` (Part 1), `part1_notebook.ipynb` |
-| **Hoàng (Data 1)** | Chủ trì Model Training. **Chủ trì `part2_notebook.ipynb`** (demo DataPipeline + KQ Train). Code Unit Test cho Part 2. Tự đóng góp 1-2 tài liệu tham khảo phần API/Modeling. | `part2/model_comparison.py`, `part2_notebook.ipynb` |
-| **Minh (Toán 2)** | Tối ưu hóa thuật toán Ridge/Lasso nếu chạy chậm. Chủ trì maintain và code Unit Test cho Part 1. Tự đóng góp 1-2 tài liệu tham khảo phần Regularization. | `tests/test_part1.py` |
-| **Dương (Data 2)** | Vẽ biểu đồ Feature Importance từ KQ của Hoàng. **Chủ trì LaTeX Part 2 và viết phần Kết luận (Conclusion) cho toàn bộ báo cáo**. Tự đóng góp 1-2 tài liệu tham khảo phần Imputation/Encoding. | `report/report.tex` (Part 2 & Conclusion) |
-
-### 🎯 Checkpoint Ngày 11: Hoàng merge xong model_comparison.py. Linh merge xong part1_notebook.ipynb. Bảo bắt đầu sanity check tổng.
+### 2.3. Cross-Validation & Monte Carlo
+* [cite_start]**K-Fold CV:** Tự xây dựng hàm chia tập dữ liệu thành $k$ phần (khuyến nghị $k=5$) để tìm siêu tham số $\lambda$ tối ưu cho Ridge và Lasso[cite: 158].
+* [cite_start]**Mô phỏng Gauss-Markov:** Sinh ngẫu nhiên hàng ngàn mẫu dữ liệu nhiễu, tính $\hat{\beta}$ cho từng mẫu để chứng minh tính không chệch $\mathbb{E}[\hat{\beta}] = \beta$ bằng thực nghiệm[cite: 100, 172].
 
 ---
 
-## 🛡️ Khung Đánh Giá Chất Lượng (Quality Assurance & Logic Check)
-Bất kỳ PR nào vi phạm sẽ bị Leader Reject.
+## 📊 3. Phần 2: Pipeline Dữ Liệu Thực Tế (Real-World Application)
+**Mục tiêu:** Áp dụng hệ thống toán học vào bộ dữ liệu thực tế thỏa mãn các điều kiện khắt khe về kích thước và missing values.
 
-1. **Sự nhất quán Dữ liệu (The "One Truth"):** Kích thước (n) của tập Train bắt buộc phải bằng tổng số dòng sau xử lý Missing Values ở Part 2.2.
-2. **Bức tường Data Leakage:** Imputation/Standardization chỉ dùng `.fit()` trên **X_train**. Tập **X_test** chỉ được phép dùng `.transform()` nhằm triệt tiêu hoàn toàn rủi ro rò rỉ dữ liệu (Data Leakage).
-3. **Liên kết Toán học:** Tính beta_hat = (X^T X)^-1 X^T y và ma trận H bằng Numpy chuẩn xác. Cấm dùng vòng lặp `for`.
-4. **Xử lý Biến Mục Tiêu:** Log-transform lương (y' = ln(Salary)) khi train. Dịch ngược bằng exp(y') khi tính toán MAE/RMSE cuối cùng.
-5. **Tiêu chuẩn Học thuật (Report Rules):** Báo cáo bắt buộc phải đủ Trang bìa, Mục lục, Kết luận và Danh mục tài liệu tham khảo có tối thiểu 5 nguồn uy tín (sách, bài báo khoa học, nguồn tài liệu chính thống của giải đấu).
+### 3.1. Ràng Buộc Dữ Liệu
+* **Đầu vào:** File `nba_salary_raw.csv`. [cite_start]Dữ liệu đáp ứng điều kiện $n \ge 200$, $p \ge 3$ và có cột chứa $\ge 5\%$ giá trị khuyết tự nhiên[cite: 184, 186, 188].
+* [cite_start]**Biến mục tiêu (Target):** Bài toán hồi quy liên tục[cite: 187]. Áp dụng phép biến đổi Logarit $y = \ln(\text{Salary})$ để xử lý phân phối lệch phải (right-skewed) của mức lương NBA.
 
----
+### 3.2. Tiền Xử Lý Hướng Đối Tượng (OOP DataPipeline)
+Thiết kế class `NBADataPipeline` tuân thủ nghiêm ngặt nguyên tắc ngăn chặn rò rỉ dữ liệu:
+1.  **Giai đoạn Học (`.fit()`):** Chỉ trích xuất các tham số (mean, $\mu$, $\sigma$, cấu trúc Dummy variables, mô hình K-NN) từ tập **Train**.
+2.  **Giai đoạn Biến đổi (`.transform()`):**
+    * [cite_start]Sử dụng **K-NN Imputation (MV4)** để điền khuyết các chỉ số thi đấu[cite: 222]. Quá trình này bắt buộc phải thực hiện *sau khi* chuẩn hóa (Standardization) để thuật toán tính khoảng cách không bị sai lệch.
+    * Xử lý biến phân loại bằng `get_dummies` với tham số `drop_first=True` để né bẫy biến giả (Dummy Variable Trap), ngăn chặn hiện tượng đa cộng tuyến hoàn hảo khiến ma trận $X^T X$ bị suy biến.
+    * Căn chỉnh cột (Alignment) bằng `.reindex()` để đảm bảo tập Test có ma trận thiết kế cấu trúc chính xác như tập Train.
 
-## 📚 Hệ Sinh Thái Kiến Thức Cốt Lõi (Mandatory Knowledge per Member)
-Mỗi thành viên **bắt buộc** phải nắm vững các khối kiến thức tương ứng với phân công thực tế để phục vụ quá trình bảo vệ vấn đáp trước giảng viên:
-
-| Thành viên | Khối Kiến Thức Bắt Buộc Phải Ôn Tập |
-| :--- | :--- |
-| **Bảo (Leader)** | Bias-Variance Tradeoff, Monte Carlo Simulation properties, Data Leakage prevention, OLS Assumptions (Gauss-Markov Theorem). |
-| **Linh (Toán 1)** | Chứng minh công thức OLS (OLS derivation), tính chất ma trận hình chiếc mũ (Hat Matrix Idempotence), mô phỏng lặp Monte Carlo. |
-| **Minh (Toán 2)** | Cơ chế thu hẹp biến của Ridge/Lasso regularization, thuật toán tối ưu Coordinate Descent cho Lasso, nguyên lý K-Fold Cross Validation. |
-| **Hoàng (Data 1)**| Các cơ chế khuyết dữ liệu (MCAR, MAR, MNAR), tư duy xử lý và ghép nối bảng (Pandas merge/join), kỹ thuật gọi API và xử lý giới hạn băng thông (Rate Limiting). |
-| **Dương (Data 2)**| Thuật toán điền khuyết KNN Imputation, mã hóa biến phân loại (Categorical Encoding), bẫy biến giả (Dummy Variable Trap), phân biệt chuẩn hóa dữ liệu (Standardization vs Normalization). |
+### 3.3. Đánh Giá & Phân Tích
+* [cite_start]Chạy 3 mô hình so sánh: OLS cơ bản, OLS chọn biến (lọc theo VIF), và Ridge/Lasso[cite: 251].
+* [cite_start]Chẩn đoán phần dư: Vẽ 4 biểu đồ (Residuals vs Fitted, Q-Q Plot, Scale-Location, Cook's Distance) trên mô hình tốt nhất để kiểm tra các giả thiết Gauss-Markov[cite: 153, 154, 155, 156].
+* Dịch ngược dự đoán: Áp dụng hàm $\exp(\hat{y})$ trước khi tính toán các chỉ số lỗi cuối cùng (MAE, RMSE) để đưa kết quả về lại đơn vị USD thực tế.
 
 ---
 
-## 🚨 Kế Hoạch Dự Phòng (Backup Plan)
-Để đảm bảo đúng tiến độ Hard Deadline 14 ngày, toàn nhóm tuân thủ các phương án ứng phó rủi ro sau:
-* **Rủi ro Toán học:** Nếu A bị trễ tiến độ (delay) thuật toán Lasso Coordinate Descent, Linh lập tức tạm dừng việc khác để support 50% khối lượng code Ridge/Lasso.
-* **Rủi ro Dữ liệu:** Nếu Hoàng bị kẹt ở khâu gọi API/Merge dữ liệu, A sẽ nhận lại file CSV thô để chạy tạm Model Comparison, Hoàng chuyển sang fix bug API sau.
-
----
-
-## 📦 Danh Mục Bàn Giao Bắt Buộc (Mandatory Github Deliverables)
-1 file = 1 Owner. Owner là người chịu trách nhiệm chính nếu có bug.
+## 📦 4. Cấu Trúc Bàn Giao Kỹ Thuật (Deliverables Architecture)
+[cite_start]Hệ thống thư mục bắt buộc phải tuân thủ thiết kế sau để đáp ứng tiêu chí chấm điểm tự động[cite: 307]:
 
 ```text
 📦 Group_<ID>_Project2/
  ┣ 📂 part1/
- ┃ ┣ 📜 ols_implementation.py        # Owner: Linh
- ┃ ┣ 📜 ridge_lasso.py               # Owner: A
- ┃ ┣ 📜 residual_analysis.py         # Owner: Linh
- ┃ ┗ 📜 cross_validation.py          # Owner: A
+ ┃ ┣ 📜 ols_implementation.py        # Core OLS & metrics (No sklearn)
+ ┃ ┣ 📜 ridge_lasso.py               # Regularization & Coordinate Descent
+ ┃ ┣ 📜 residual_analysis.py         # Diagnostic plots
+ ┃ ┗ 📜 cross_validation.py          # K-fold CV implementation
  ┣ 📂 part2/
- ┃ ┣ 📂 data/                        # Owner: Hoàng
- ┃ ┃ ┗ 📜 nba_salary_raw.csv         
- ┃ ┣ 📜 data_pipeline.py             # Owner: Dương
- ┃ ┗ 📜 model_comparison.py          # Owner: Hoàng
- ┣ 📂 report/                        # Owner: Dương (Part 2 & Conclusion), Linh (Part 1), Bảo (Format)
- ┃ ┣ 📜 report.tex                   
- ┃ ┗ 📜 report.pdf                   
- ┣ 📜 part1_notebook.ipynb           # Owner: Linh
- ┣ 📜 part2_notebook.ipynb           # Owner: Hoàng
- ┣ 📜 requirements.txt               # Owner: Bảo (Duyệt cuối)
- ┣ 📜 README.md                      # Owner: Bảo
- ┗ 📂 .github/
-   ┗ 📜 pull_request_template.md     # Owner: Bảo
+ ┃ ┣ 📂 data/
+ ┃ ┃ ┗ 📜 nba_salary_raw.csv         # Raw dataset
+ ┃ ┣ 📜 data_pipeline.py             # OOP Pipeline (Fit/Transform)
+ ┃ ┗ 📜 model_comparison.py          # Training, Evaluation & Metrics
+ ┣ 📂 report/
+ ┃ ┣ 📜 report.tex                   # LaTeX Source
+ ┃ ┗ 📜 report.pdf                   # Compiled PDF Document
+ ┣ 📜 part1_notebook.ipynb           # Theoretical demo & Monte Carlo
+ ┣ 📜 part2_notebook.ipynb           # Pipeline execution & Results interpretation
+ ┣ 📜 requirements.txt               # Dependencies list
+ ┗ 📜 README.md                      # Reproducibility instructions
