@@ -81,6 +81,7 @@ class NBADataPipeline:
         
         # 5. Kết hợp các đặc trưng
         X_out = pd.concat([X_clean[self.numeric_features], X_dummy], axis=1)
+        X_out = X_out.astype(float)
         
         # 6. Tách biến mục tiêu y (nếu có) để phục vụ cho mô hình hồi quy
         y_out = None

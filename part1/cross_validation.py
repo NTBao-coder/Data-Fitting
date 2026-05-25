@@ -1,5 +1,8 @@
 import numpy as np
-from ridge_lasso import ridge_fit, lasso_fit, predict
+try:
+    from part1.ridge_lasso import ridge_fit, lasso_fit, predict
+except ModuleNotFoundError:
+    from ridge_lasso import ridge_fit, lasso_fit, predict
 
 
 # =========================================================

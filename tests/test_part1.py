@@ -419,3 +419,62 @@ class TestFindBestLambda:
         )
         assert best_lam in lambdas
         assert best_score > 0
+
+
+# =========================================================
+# Advanced Methods Tests
+# =========================================================
+
+from part1.advanced_methods import (
+    elastic_net_fit,
+    huber_irls_fit,
+    bayesian_linear_fit,
+)
+
+class TestAdvancedMethods:
+
+    def test_elastic_net_converges_to_ols(self, simple_data):
+        """Khi alpha -> 0, Elastic Net tiệm cận OLS."""
+        X, y = simple_data
+        beta = elastic_net_fit(X, y, l1_ratio=0.5, alpha=1e-6, max_iter=5000)
+        np.testing.assert_allclose(beta, [0, 2], atol=1e-2)
+
+    def test_elastic_net_sparsity(self, noisy_data):
+        """L1 penalty lớn dẫn đến đặc trưng bị triệt tiêu (sparsity)."""
+        X, y = noisy_data
+        beta = elastic_net_fit(X, y, l1_ratio=1.0, alpha=10.0) # Tương đương Lasso
+        assert np.any(beta[1:] == 0)
+
+    def test_huber_robustness(self):
+        """Huber loss giảm thiểu ảnh hưởng của ngoại lai (outliers) tốt hơn OLS."""
+        np.random.seed(42)
+        n = 100
+        x = np.random.randn(n)
+        X = np.column_stack([np.ones(n), x])
+        true_beta = np.array([2.0, 3.0])
+        y = X @ true_beta + np.random.randn(n) * 0.1
+        
+        # Tạo outliers nặng
+        y[0] += 50.0
+        y[1] -= 50.0
+        
+        # OLS fit
+        beta_ols = np.linalg.solve(X.T @ X, X.T @ y)
+        
+        # Huber fit
+        beta_huber = huber_irls_fit(X, y, delta=1.345)
+        
+        # Huber phải gần true_beta hơn nhiều so với OLS do OLS bị kéo theo outliers
+        err_ols = np.linalg.norm(beta_ols - true_beta)
+        err_huber = np.linalg.norm(beta_huber - true_beta)
+        assert err_huber < err_ols
+        assert err_huber < 0.5  # Huber phải rất gần true_beta
+
+    def test_bayesian_linear_fit(self, simple_data):
+        """Bayesian linear regression tính đúng trung bình và phương sai hậu nghiệm."""
+        X, y = simple_data
+        mu_N, Sigma_N = bayesian_linear_fit(X, y, alpha=1e-3, beta_n=1e3) # prior yếu, likelihood mạnh
+        # Sẽ rất gần OLS beta [0, 2]
+        np.testing.assert_allclose(mu_N, [0, 2], atol=1e-2)
+        assert Sigma_N.shape == (2, 2)
+        assert np.all(np.diag(Sigma_N) > 0)

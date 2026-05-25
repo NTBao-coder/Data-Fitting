@@ -90,12 +90,18 @@ def lasso_fit(X, y, lam=1.0, max_iter=1000, tol=1e-4):
     => Tương đương khi α_sklearn = λ / (2 * n)
     """
 
-    # n = số samples
-    # p = số features
     n, p = X.shape
 
     # Khởi tạo beta ban đầu = 0
     beta = np.zeros(p)
+    # Khởi tạo vector dự đoán y_predict = X @ beta = 0
+    y_predict = np.zeros(n)
+
+    # Tính trước chuẩn bình phương của các cột (z_j = X_j^T X_j)
+    # Tránh tính toán lại nhiều lần trong loop
+    z = np.sum(X ** 2, axis=0)
+    # Tránh chia cho 0 nếu cột toàn 0
+    z = np.where(z == 0, 1e-12, z)
 
     # Lặp tối đa max_iter lần
     for _ in range(max_iter):
@@ -107,23 +113,22 @@ def lasso_fit(X, y, lam=1.0, max_iter=1000, tol=1e-4):
         # cập nhật từng coefficient beta_j
         for j in range(p):
 
-            # Không regularize intercept
+            beta_old_j = beta[j]
+
+            # Loại bỏ contribution hiện tại của feature j khỏi y_predict
+            val_j = y_predict - X[:, j] * beta_old_j
+            residual = y - val_j
+            rho = X[:, j] @ residual
+
+            # Không regularize intercept (j = 0)
             if j == 0:
-                beta[j] = np.sum(y - (predict(X, beta) - X[:, j] * beta[j])) / np.sum(X[:, j] ** 2)
-                continue
+                beta[j] = np.sum(residual) / z[j]
+            else:
+                beta[j] = soft_threshold(rho, lam) / z[j]
 
-            # Prediction hiện tại
-            y_predict = predict(X, beta)
-
-            # Loại bỏ contribution hiện tại của feature j
-            # để cập nhật riêng beta_j
-            residual = y - (y_predict - X[:, j] * beta[j])
-
-            # Đo mức độ liên quan giữa feature j và residual
-            rho = np.sum(X[:, j] * residual)
-
-            # Update beta_j bằng soft-thresholding
-            beta[j] = (soft_threshold(rho, lam) / np.sum(X[:, j] ** 2))
+            # Cập nhật y_predict nếu beta_j thay đổi
+            if beta[j] != beta_old_j:
+                y_predict += X[:, j] * (beta[j] - beta_old_j)
 
         # Nếu beta gần như không đổi nữa
         # thì model đã hội tụ
@@ -158,24 +163,30 @@ def vif(X):
         # để dùng các feature còn lại predict nó
         X_rest = np.delete(X, j, axis=1)
 
-        # Fit OLS:
-        # X_rest -> y_j
-        beta = np.linalg.lstsq(X_rest, y_j, rcond=None)[0]
+        try:
+            # Fit OLS:
+            # X_rest -> y_j
+            # Thay thế np.linalg.lstsq bằng np.linalg.solve để tuân thủ Constraint 1
+            XTX = X_rest.T @ X_rest
+            XTy = X_rest.T @ y_j
+            beta = np.linalg.solve(XTX, XTy)
 
-        # Prediction của feature j
-        y_hat = predict(X_rest, beta)
+            # Prediction của feature j
+            y_hat = predict(X_rest, beta)
 
-        # Tính R^2
-        r2 = 1 - (np.sum((y_j - y_hat) ** 2) / np.sum((y_j - np.mean(y_j)) ** 2))
+            # Tính R^2
+            r2 = 1 - (np.sum((y_j - y_hat) ** 2) / np.sum((y_j - np.mean(y_j)) ** 2))
 
-        # Tránh chia cho 0 nếu R^2 ≈ 1
-        if np.isclose(r2, 1):
+            # Tránh chia cho 0 nếu R^2 ≈ 1
+            if np.isclose(r2, 1) or r2 >= 1.0:
+                vif_values.append(np.inf)
+            else:
+                # Công thức:
+                # VIF = 1 / (1 - R^2)
+                vif_values.append(1 / (1 - r2))
+        except np.linalg.LinAlgError:
+            # Nếu ma trận kì dị, VIF là vô cùng
             vif_values.append(np.inf)
-
-        else:
-            # Công thức:
-            # VIF = 1 / (1 - R^2)
-            vif_values.append(1 / (1 - r2))
 
     return np.array(vif_values)
 
