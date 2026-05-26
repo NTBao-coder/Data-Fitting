@@ -1,0 +1,39 @@
+1. Mô tả, đánh giá dữ liệu:
+1.1: Mô tả dữ lieu: Bộ dữ liệu gồm 
+- Player Name: Tên cầu thủ
+- Salary: Lương của cầu thủ
+- Position: Vị trí thi đấu (PG, SG, ...)
+- Age: Tuổi cầu thủ
+- Team: Đội của cầu thủ
+- GP - Games Played: Số trận đã thi đấu.
+- GS - Games Started: Số trận thi đấu chính.
+- MP - Minutes Played: Số phút thi đấu mỗi trận.
+- FG, FGA, FG%: Số cú ném thành công vào rổ, số cú ném bóng (tính cả thành công và không thành công), tỉ lệ ném thành công.
+- 3P, 3PA, 3P%: Số cú ném 3 điểm vào rổ, số cú ném 3 điểm (tính cả thành công và không thành công), tỉ lệ ném thành công.
+- 2P, 2PA, 2P%: Số cú ném 2 điểm vào rổ, số cú ném 2 điểm (tính cả thành công và không thành công), tỉ lệ ném thành công.
+- eFG%:
+- FT, FTA, FT%: Số cú ném phạt vào rổ, số cú ném phạt, tỉ lệ ném phạt thành công.
+- ORB, DRB, TRB: Các chỉ số về Rebound - Bắt bóng bật bảng:
++ ORB: Rebound của 1 cầu thủ tấn công
++ DRB: Rebound của 1 cầu thủ phòng ngự
++ TRB: Tổng số lần Rebound.
+- AST: Số kiến tạo.
+- STL: Số lần cướp bóng.
+- BLK: Số lần chắn bóng
+- TOV: Số lần mất bóng.
+- PTS: Số điểm ghi trong mỗi trận
+- Total Minute: Tổng số phút cầu thủ đã chơi.
+- TS%: Tỉ lệ ném bóng thực tế.
+- USG%: Tỉ lệ cầm bóng.
+- WS: Số trận thắng có cầu thủ đó.
+- BPM: Điểm cầu thủ ghi được / 100 đợt kiểm soát
+- VORP: Giá trị 1 cầu thủ so với 1 cầu thủ thay thế.
+1.2: Sơ lược về kiểu dữ liệu và miền giá trị của các biến:
+- Player Name: Kiểu String.
+- Salary: Kiểu số, phạm vi: $1,017,781 - $48,070,014
+- Position: Kiểu String, phạm vi: {"PG", "SG", "SF", "PF", "C"}
+- Age: Kiểu số, phạm vi: 19 - 42
+- Team: Kiểu String
+- GP: Kiểu số, phạm vi: 1 - 82
+- GS: Kiểu số, phạm vi: (0, GP]
+- MP: Kiểu số, phạm vi: 1.0 - 39.5
