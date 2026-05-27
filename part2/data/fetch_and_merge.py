@@ -27,11 +27,18 @@ def build_raw_dataset():
     # Sử dụng Inner Join để đảm bảo chỉ giữ lại những cầu thủ có cả dữ liệu chỉ số và lương
     df_final = pd.merge(df_api, df_salary[['PLAYER_NAME', 'SALARY']], on='PLAYER_NAME', how='inner')
 
-    print("4. Xuất file cho DataPipeline...")
+    print("4. Đang làm sạch dữ liệu (Xóa trùng lặp & Xử lý nhiễu)...")
+    # 4.1 Xóa các dòng trùng lặp dựa trên tên cầu thủ (nếu có)
+    df_final = df_final.drop_duplicates(subset=['PLAYER_NAME'])
+    
+    # 4.2 Lọc dữ liệu nhiễu (loại bỏ các cầu thủ thi đấu quá ít)
+    df_final = df_final[(df_final['GP'] >= 5) & (df_final['MIN'] >= 50)]
+
+    print("5. Xuất file cho DataPipeline...")
     output_path = "nba_salary_raw.csv"
     df_final.to_csv(output_path, index=False)
-    print(f"✅ Hoàn tất! File đã được lưu tại: {output_path}")
-    print(f"📊 Kích thước dữ liệu: {df_final.shape[0]} dòng, {df_final.shape[1]} cột.")
+    print(f"Hoàn tất! File đã được lưu tại: {output_path}")
+    print(f"Kích thước dữ liệu: {df_final.shape[0]} dòng, {df_final.shape[1]} cột.")
 
 if __name__ == "__main__":
     build_raw_dataset()

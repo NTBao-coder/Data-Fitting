@@ -327,11 +327,11 @@ def main():
     diag_path = "residuals_diagnostic.png"
     fig.savefig(diag_path)
     plt.close(fig)
-    print(f"📊 Đã vẽ và lưu chẩn đoán phần dư của mô hình tốt nhất tại: {diag_path}")
+    print(f"Đã vẽ và lưu chẩn đoán phần dư của mô hình tốt nhất tại: {diag_path}")
 
     # 6. Đồ thị dự đoán khoảng tin cậy Bayesian (Chọn ngẫu nhiên 20 cầu thủ để hiển thị rõ)
     print(
-        "📊 Tạo biểu đồ khoảng tin cậy Bayesian cho 20 cầu thủ ngẫu nhiên trong tập Test..."
+        "Tạo biểu đồ khoảng tin cậy Bayesian cho 20 cầu thủ ngẫu nhiên trong tập Test..."
     )
     np.random.seed(42)
     sample_indices = np.random.choice(len(y_test_raw), 20, replace=False)
@@ -382,7 +382,7 @@ def main():
     print(f"✅ Đã lưu đồ thị khoảng tin cậy Bayesian tại: {bayes_interval_path}")
 
     # 7. Giải thích đặc trưng quan trọng của OLS chọn biến
-    print("\n🔍 Ý NGHĨA THỐNG KÊ & PHÂN TÍCH HỆ SỐ HỒI QUY (OLS CHỌN BIẾN):")
+    print("\nÝ NGHĨA THỐNG KÊ & PHÂN TÍCH HỆ SỐ HỒI QUY (OLS CHỌN BIẾN):")
     final_feats = results["OLS Chọn Biến"]["features"]
     coefs_selected = results["OLS Chọn Biến"]["coefficients"][1:]
     intercept_selected = results["OLS Chọn Biến"]["coefficients"][0]
