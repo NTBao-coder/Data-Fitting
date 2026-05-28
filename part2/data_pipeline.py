@@ -1,139 +1,121 @@
-
 import pandas as pd
 import numpy as np
 
-class NBADataPipeline:
-    def __init__(self):
-        self.mean_values = None
-        self.scaler_params = {} 
-        self.categorical_columns = ['Position', 'Team']
+class RigorousNBAPipeline:
+    def __init__(self, vif_threshold=10.0):
+        self.vif_threshold = vif_threshold
+        # Từ điển lưu trữ trạng thái (State) học được từ tập Train
+        self.imputation_values = {}  # Lưu giá trị thay thế Missing Values
+        self.encoded_columns = []    # Lưu cấu trúc cột One-hot Encoding
+        self.scaler_params = {}      # Lưu mean (mu) và std (sigma) để chuẩn hóa
+        self.vif_passed_features = [] # Danh sách các cột vượt qua bài test Đa cộng tuyến
         
-        # 1. DANH SÁCH LOẠI BỎ BIẾN 
-        self.exclude_columns = [
-            'Unnamed: 0', 'Player', 'Player-additional', 'PLAYER_SLUG',
-            'FIRST_NAME', 'LAST_NAME', 'DISPLAY_LAST_COMMA_FIRST', 'DISPLAY_FI_LAST',
-            'BIRTHDATE', 'SCHOOL', 'COUNTRY', 'LAST_AFFILIATION', 'PLAYERCODE',
-            'PERSON_ID', 'TEAM_ID', 'TEAM_NAME', 'TEAM_ABBREVIATION', 'TEAM_CODE', 'TEAM_CITY',
-            'FROM_YEAR', 'TO_YEAR', 'JERSEY', 'POSITION', 'ROSTERSTATUS',
-            'GAMES_PLAYED_CURRENT_SEASON_FLAG', 'DLEAGUE_FLAG', 'NBA_FLAG', 'GAMES_PLAYED_FLAG',
-            'DRAFT_YEAR', 'DRAFT_ROUND', 'DRAFT_NUMBER', 'GREATEST_75_FLAG',
-            'Salary', 'Log_Salary'
+        self.categorical_features = ['Position', 'Team'] # Các cột cần encode
+        self.exclude_cols = ['Player', 'Salary', 'Log_Salary', 'Unnamed: 0'] # ID và Target
+        
+        self.is_fitted = False
+
+    def _base_feature_engineering(self, df):
+        """Bước 0: Tạo biến mới độc lập (Không gây Data Leakage vì tính trên từng dòng)"""
+        X = df.copy()
+        
+        # 1. Advanced Metrics (TS%)
+        if set(['PTS', 'FGA', 'FTA']).issubset(X.columns):
+            X['TS_pct'] = X['PTS'] / (2 * (X['FGA'] + 0.44 * X['FTA']) + 1e-9)
+        
+        # 2. Domain Knowledge (Rookie / Superstar Clusters)
+        if 'Age' in X.columns:
+            X['is_rookie'] = (X['Age'] <= 23).astype(int)
+        if set(['PTS', 'MP']).issubset(X.columns):
+            X['is_superstar'] = (((X['PTS'] / (X['MP'] + 1e-9)) * 36 > 20) & (X['MP'] > 2000)).astype(int)
+
+        # 3. Chuẩn hóa Per 36 Minutes và HỦY BỎ cột thô
+        count_stats = ['PTS', 'TRB', 'AST', 'STL', 'BLK', 'TOV']
+        if 'MP' in X.columns:
+            for col in count_stats:
+                if col in X.columns:
+                    X[f'{col}_per36'] = (X[col] / (X['MP'] + 1e-9)) * 36
+            X.drop(columns=[c for c in count_stats if c in X.columns], inplace=True)
+            
+        return X
+
+    def fit(self, X_train):
+        """BƯỚC HỌC: Chỉ tính toán tham số từ X_train và cất vào State"""
+        X = self._base_feature_engineering(X_train)
+        
+        # Lọc ra danh sách biến số học thực sự
+        numeric_cols = X.select_dtypes(include=[np.number]).columns.tolist()
+        self.numeric_features = [c for c in numeric_cols if c not in self.exclude_cols]
+
+        X_temp = X.copy()
+
+        # THỨ TỰ 1: Học Missing Values (Tính Mean của tập Train)
+        for col in self.numeric_features:
+            mean_val = X_temp[col].mean()
+            self.imputation_values[col] = mean_val
+            X_temp[col] = X_temp[col].fillna(mean_val) # Điền nội bộ để tính bước sau
+
+        # THỨ TỰ 2: Học cấu trúc Encoding (Ghi nhớ các Category có trong Train)
+        if set(self.categorical_features).issubset(X_temp.columns):
+            X_dummy = pd.get_dummies(X_temp[self.categorical_features], drop_first=True)
+            self.encoded_columns = X_dummy.columns.tolist()
+
+        # THỨ TỰ 3: Học Standardization (Tính mu và sigma của tập Train)
+        for col in self.numeric_features:
+            mu = X_temp[col].mean()
+            sigma = X_temp[col].std()
+            sigma = 1.0 if pd.isna(sigma) or sigma == 0 else sigma
+            
+            self.scaler_params[col] = {'mu': mu, 'sigma': sigma}
+            X_temp[col] = (X_temp[col] - mu) / sigma # Chuẩn hóa nội bộ
+
+        # THỨ TỰ 4: Học VIF (Lọc đa cộng tuyến trên dữ liệu Train ĐÃ CHUẨN HÓA)
+        corr_matrix = X_temp[self.numeric_features].corr().values
+        inv_corr = np.linalg.pinv(corr_matrix) # Dùng Pseudo-inverse để an toàn
+        vifs = np.diag(inv_corr)
+        
+        self.vif_passed_features = [
+            col for col, vif in zip(self.numeric_features, vifs) if vif <= self.vif_threshold
         ]
-        
-        self.numeric_features = []
-        self.dummy_columns = []
-        self.final_feature_columns = []
-        self.is_fitted = False # Cờ kiểm tra an toàn hệ thống
 
-    def fit(self, X):
-        """
-        Bước 'Học': Tính toán và lưu trữ các thông số thống kê từ tập huấn luyện (Train set).
-        """
-        X_clean = X.copy()
-        
-        # 2. Tự động lọc ra các cột số thực sự mang giá trị chuyên môn toán học
-        numeric_df = X_clean.select_dtypes(include=[np.number])
-        self.numeric_features = [c for c in numeric_df.columns if c not in self.exclude_columns]
-        
-        # Tính giá trị trung vị/trung bình để gán cho các ô dữ liệu bị khuyết (Imputation)
-        self.mean_values = X_clean[self.numeric_features].mean()
-        
-        # 3. Học thông số để chuẩn hóa Z-score (Standardization)
-        for col in self.numeric_features:
-            col_std = X_clean[col].std()
-            # Tránh lỗi chia cho 0 nếu cột đó là một hằng số (phương sai = 0)
-            if pd.isna(col_std) or col_std == 0:
-                col_std = 1.0
-                
-            self.scaler_params[col] = {
-                'mean': X_clean[col].mean(),
-                'std': col_std
-            }
-            
-        # 4. Học cấu trúc các cột phân loại (One-Hot Encoding)
-        # Chỉ lấy các cột phân loại được chỉ định, loại bỏ hoàn toàn các cột chữ định danh khác
-        X_dummy = pd.get_dummies(X_clean[self.categorical_columns], columns=self.categorical_columns, drop_first=True)
-        self.dummy_columns = X_dummy.columns.tolist()
-        
-        # Tập hợp danh sách thuộc tính chuẩn chỉnh cuối cùng
-        self.final_feature_columns = self.numeric_features + self.dummy_columns
         self.is_fitted = True
-        print(f"Pipeline: Học thông số hoàn tất! Tổng số đặc trưng thực tế đưa vào mô hình: {len(self.final_feature_columns)}")
 
-    def transform(self, X):
-        """
-        Bước 'Biến đổi': Áp dụng các thông số đã học ở tập Train lên dữ liệu mới (Train/Test).
-        """
-        # KIỂM TRA AN TOÀN: Bắt lỗi nếu chưa gọi fit nhằm chống rò rỉ dữ liệu (Data Leakage)
+    def transform(self, X_data):
+        """BƯỚC BIẾN ĐỔI: Áp đặt tham số đã học lên bất kỳ tập dữ liệu nào (Train/Test)"""
         if not self.is_fitted:
-            raise RuntimeError("LỖI HỆ THỐNG: Bạn không thể gọi hàm .transform() trước khi gọi hàm .fit() trên tập Train!")
+            raise RuntimeError("Lỗi: Phải gọi hàm fit() trước khi transform()")
             
-        X_clean = X.copy()
+        X = self._base_feature_engineering(X_data)
+        X_out = pd.DataFrame(index=X.index)
 
-        # 1. Thực hiện biến đổi mục tiêu như mô tả trong báo cáo: y = ln(Salary)
-        if 'Salary' in X_clean.columns:
-            X_clean['Log_Salary'] = np.log(X_clean['Salary'])
-            
-        # 2. Xử lý Missing Values một cách đồng bộ (Imputation)
-        for col, value in self.mean_values.items():
-            if col in X_clean.columns:
-                X_clean[col] = X_clean[col].fillna(value)
-
-        # 3. Thực thi chuẩn hóa dữ liệu số (Standardization)
+        # THỨ TỰ 1: Xử lý Missing Values (Áp dụng Mean của Train)
         for col in self.numeric_features:
-            if col in X_clean.columns:
-                mu = self.scaler_params[col]['mean']
-                sigma = self.scaler_params[col]['std']
-                X_clean[col] = (X_clean[col] - mu) / sigma
+            if col in X.columns:
+                X[col] = X[col].fillna(self.imputation_values[col])
 
-        # 4. Mã hóa biến phân loại và đồng bộ hóa cấu trúc cột giữa Train và Test
-        X_dummy = pd.get_dummies(X_clean[self.categorical_columns], columns=self.categorical_columns, drop_first=True)
-        # Cực kỳ quan trọng: Reindex giúp tập Test luôn có đúng số lượng và thứ tự cột giống tập Train
-        X_dummy = X_dummy.reindex(columns=self.dummy_columns, fill_value=0)
-        
-        # 5. Gom các mảng đặc trưng số và đặc trưng dummy lại thành ma trận hoàn chỉnh
-        X_out = pd.concat([X_clean[self.numeric_features], X_dummy], axis=1)
-        
-        # Giữ lại biến mục tiêu để các file model thực hiện huấn luyện/đánh giá hiệu năng
-        if 'Log_Salary' in X_clean.columns:
-            X_out['Log_Salary'] = X_clean['Log_Salary']
-        elif 'Salary' in X_clean.columns:
-            X_out['Salary'] = X_clean['Salary']
-            
-        return X_out
-
-    def process_pipeline(self, train_df, test_df):
-        """Hàm tiện ích chạy trọn gói quy trình làm sạch dữ liệu nhanh chóng"""
-        self.fit(train_df)
-        train_processed = self.transform(train_df)
-        test_processed = self.transform(test_df)
-        return train_processed, test_processed
-
-
-if __name__ == "__main__":
-    # --- KHU VỰC CHẠY KIỂM THỬ ĐỘC LẬP ---
-    try:
-        # Thử đọc file dữ liệu NBA thực tế
-        df = pd.read_csv('merged_nba_data.csv')
-        
-        train_df = df.sample(frac=0.8, random_state=42)
-        test_df = df.drop(train_df.index)
-
-        pipeline = NBADataPipeline()
-        train_final, test_final = pipeline.process_pipeline(train_df, test_df)
-
-        print("\n--- KIỂM TRA ---")
-        print("Kích thước ma trận Train đầu ra:", train_final.shape)
-        print("Kích thước ma trận Test đầu ra:", test_final.shape)
-        print("Số lượng cột Train và Test đồng nhất hoàn toàn:", train_final.shape[1] == test_final.shape[1])
-        
-        # Kiểm tra xem còn sót lại cột dạng chuỗi (Object) nào gây crash mô hình không
-        remaining_objects = train_final.select_dtypes(include=[object]).columns.tolist()
-        print("Số lượng cột chữ (Object) còn sót lại:", len(remaining_objects))
-        if remaining_objects:
-            print("Cảnh báo các cột sót:", remaining_objects)
+        # THỨ TỰ 2: Encoding (Đồng bộ cấu trúc cột với Train)
+        if set(self.categorical_features).issubset(X.columns):
+            X_dummy = pd.get_dummies(X[self.categorical_features], drop_first=True)
+            # Hàm reindex cực kỳ quan trọng: 
+            # - Nếu Test thiếu category -> tạo cột toàn 0
+            # - Nếu Test dư category lạ -> loại bỏ cột đó
+            X_dummy = X_dummy.reindex(columns=self.encoded_columns, fill_value=0)
         else:
-            print(" Dữ liệu hoàn toàn sạch sẽ, không còn biến nhiễu hay chữ định danh rác!")
+            # Fallback nếu df không có cột category
+            X_dummy = pd.DataFrame(0, index=X.index, columns=self.encoded_columns)
+
+        # THỨ TỰ 3: Standardization (Trừ mu_train và chia sigma_train)
+        # Tối ưu: Chỉ cần chuẩn hóa những cột số đã vượt qua bài test VIF
+        for col in self.vif_passed_features:
+            mu = self.scaler_params[col]['mu']
+            sigma = self.scaler_params[col]['sigma']
+            X_out[col] = (X[col] - mu) / sigma
+
+        # THỨ TỰ 4: Lắp ráp ma trận cuối cùng (Đã trừ khử VIF + Đã Encode)
+        X_final = pd.concat([X_out[self.vif_passed_features], X_dummy], axis=1)
+        
+        # Xử lý biến mục tiêu (Nếu có)
+        if 'Salary' in X.columns:
+            X_final['Log_Salary'] = np.log(X['Salary'])
             
-    except FileNotFoundError:
-        print("Thông báo: Hãy để file 'merged_nba_data.csv' chung thư mục nếu muốn chạy thử nghiệm độc lập.")
+        return X_final
