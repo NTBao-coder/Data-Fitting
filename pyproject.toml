@@ -1,0 +1,98 @@
+[build-system]
+requires = ["setuptools>=75.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+# ── Project metadata ────────────────────────────────────────────────────────
+
+[project]
+name = "data-fitting"
+version = "0.1.0"
+description = "OLS regression toolkit — Data Fitting lab for Math Application course"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+    { name = "NTBao" },
+]
+keywords = ["ols", "regression", "statistics", "data-fitting"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Education",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Mathematics",
+]
+
+dependencies = [
+    "numpy>=2.0",
+    "scipy>=1.12",
+    "pandas>=2.0",
+    "matplotlib>=3.8",
+    "seaborn>=0.13",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.4",
+]
+
+# ── Tool configs ────────────────────────────────────────────────────────────
+
+# -- pytest --
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-v --tb=short"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+# -- ruff (linter + formatter) --
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+src = ["part1", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort (import sorting)
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "N",    # pep8-naming
+    "D",    # pydocstyle
+]
+ignore = [
+    "D100",  # missing docstring in public module (covered by file-level)
+    "D104",  # missing docstring in public package
+    "D203",  # conflicts with D211 (no-blank-line-before-class)
+    "D213",  # conflicts with D212 (multi-line-summary-first-line)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "D",     # no docstring enforcement in tests
+    "S101",  # allow assert in tests
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+
+# -- mypy (type checking) --
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+check_untyped_defs = true
+ignore_missing_imports = true
+
+# ── Package discovery ───────────────────────────────────────────────────────
+
+[tool.setuptools.packages.find]
+include = ["part1*"]
