@@ -19,6 +19,38 @@ from part1._utils import _as_1d_float_array, _as_2d_float_array
 
 
 
+def _newton_schulz_inverse(A: np.ndarray, iterations: int = 80) -> np.ndarray:
+    """Approximate a matrix inverse using only matrix arithmetic."""
+    A = _as_2d_float_array(A, "A")
+    n_rows, n_cols = A.shape
+    if n_rows != n_cols:
+        raise ValueError("A must be a square matrix.")
+
+    identity = np.eye(n_rows)
+    one_norm = np.max(np.sum(np.abs(A), axis=0))
+    inf_norm = np.max(np.sum(np.abs(A), axis=1))
+    if np.isclose(one_norm * inf_norm, 0.0):
+        raise ValueError("A is singular and cannot be inverted.")
+
+    inverse_guess = A.T / (one_norm * inf_norm)
+
+    def iterate(current: np.ndarray, remaining: int) -> np.ndarray:
+        if remaining == 0:
+            return current
+        return iterate(current @ (2.0 * identity - A @ current), remaining - 1)
+
+    A_inv = iterate(inverse_guess, iterations)
+    if not np.allclose(A @ A_inv, identity, atol=1e-8, rtol=1e-8):
+        raise ValueError("A is singular or too ill-conditioned to invert accurately.")
+
+    return A_inv
+
+
+def _normal_equation_inverse(X: np.ndarray) -> np.ndarray:
+    """Return ``(X.T @ X)^(-1)`` without NumPy/SciPy linear solvers."""
+    return _newton_schulz_inverse(X.T @ X)
+
+
 def _validate_regression_shapes(X: np.ndarray, y: np.ndarray) -> tuple[int, int]:
     """Validate common OLS input dimensions and return ``(n, p)``."""
     n_samples, n_features = X.shape
@@ -55,10 +87,12 @@ def ols_fit(X: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, float]:
     y = _as_1d_float_array(y, "y")
     n_samples, n_features = _validate_regression_shapes(X, y)
 
-    XTX = X.T @ X
-    beta_hat = np.linalg.solve(XTX, X.T @ y)
+    XTX_inv = _normal_equation_inverse(X)
+    beta_hat = XTX_inv @ X.T @ y
     residuals = y - X @ beta_hat
     rss = residuals.T @ residuals
+    if np.isclose(rss, 0.0, atol=1e-24):
+        rss = 0.0
     sigma_squared = rss / (n_samples - n_features)
 
     return beta_hat, float(sigma_squared)
@@ -93,7 +127,8 @@ def hat_matrix(X: np.ndarray) -> np.ndarray:
     if n_samples < n_features:
         raise ValueError("X must have n_samples >= n_features.")
 
-    H = X @ np.linalg.solve(X.T @ X, X.T)
+    XTX_inv = _normal_equation_inverse(X)
+    H = X @ XTX_inv @ X.T
 
     if not np.allclose(H.T, H, atol=1e-8):
         raise RuntimeError("Hat matrix is not symmetric — possible numerical issue.")
@@ -210,8 +245,7 @@ def coef_inference(
         raise ValueError("sigma2 must be non-negative.")
 
     df_resid = n_samples - n_features
-    XTX = X.T @ X
-    cov_beta = sigma2 * np.linalg.solve(XTX, np.eye(n_features))
+    cov_beta = sigma2 * _normal_equation_inverse(X)
     std_error = np.sqrt(np.diag(cov_beta))
     t_stat = np.divide(
         beta_hat,
