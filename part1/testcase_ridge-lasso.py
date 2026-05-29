@@ -1,26 +1,30 @@
 
 import unittest
-import numpy as np
 from sklearn.linear_model import Ridge as SklearnRidge, Lasso as SklearnLasso
+
+try:
+    from part1 import helper_function as hf
+except ModuleNotFoundError:
+    import helper_function as hf
 
 try:
     from part1.ridge_lasso import MyRidge, MyLasso
 except ImportError:
     class MyRidge:
         def __init__(self, alpha): self.alpha = alpha
-        def fit(self, X, y): self.coef_ = np.zeros(X.shape[1]); self.intercept_ = 0.0
+        def fit(self, X, y): self.coef_ = hf.zeros(X.shape[1]); self.intercept_ = 0.0
     class MyLasso:
         def __init__(self, alpha): self.alpha = alpha
-        def fit(self, X, y): self.coef_ = np.zeros(X.shape[1]); self.intercept_ = 0.0
+        def fit(self, X, y): self.coef_ = hf.zeros(X.shape[1]); self.intercept_ = 0.0
 
 class TestRidgeLassoImplementation(unittest.TestCase):
     
     def setUp(self):
         """Khởi tạo dữ liệu mẫu cố định để test thuật toán"""
-        np.random.seed(42)
-        self.X = np.random.randn(100, 5) 
-        true_w = np.array([1.5, -2.0, 0.0, 3.4, 0.0]) 
-        self.y = self.X @ true_w + 1.2 + np.random.randn(100) * 0.1
+        hf.random_seed(42)
+        self.X = hf.random_randn(100, 5)
+        true_w = hf.array([1.5, -2.0, 0.0, 3.4, 0.0])
+        self.y = self.X @ true_w + 1.2 + hf.random_randn(100) * 0.1
         self.alpha = 0.5 
 
     def test_ridge_coefficients_match_sklearn(self):
@@ -31,8 +35,8 @@ class TestRidgeLassoImplementation(unittest.TestCase):
         my_model = MyRidge(alpha=self.alpha)
         my_model.fit(self.X, self.y)
         
-        np.testing.assert_allclose(my_model.coef_, sk_model.coef_, atol=1e-3,
-                                    err_msg="LỖI: Hệ số Ridge không khớp Sklearn ở điều kiện chuẩn!")
+        hf.assert_allclose(my_model.coef_, sk_model.coef_, atol=1e-3,
+                           err_msg="LỖI: Hệ số Ridge không khớp Sklearn ở điều kiện chuẩn!")
         self.assertAlmostEqual(my_model.intercept_, sk_model.intercept_, places=3)
         print("✅ Test: Ridge hoạt động chính xác ở điều kiện chuẩn.")
 
@@ -44,8 +48,8 @@ class TestRidgeLassoImplementation(unittest.TestCase):
         my_model = MyLasso(alpha=self.alpha)
         my_model.fit(self.X, self.y)
         
-        np.testing.assert_allclose(my_model.coef_, sk_model.coef_, atol=1e-2,
-                                    err_msg="LỖI: Hệ số Lasso không khớp Sklearn ở điều kiện chuẩn!")
+        hf.assert_allclose(my_model.coef_, sk_model.coef_, atol=1e-2,
+                           err_msg="LỖI: Hệ số Lasso không khớp Sklearn ở điều kiện chuẩn!")
         self.assertAlmostEqual(my_model.intercept_, sk_model.intercept_, places=2)
         print("✅ Test: Lasso hoạt động chính xác ở điều kiện chuẩn.")
 
@@ -68,8 +72,8 @@ class TestRidgeLassoImplementation(unittest.TestCase):
         my_ridge = MyRidge(alpha=0.0)
         my_ridge.fit(self.X, self.y)
         
-        np.testing.assert_allclose(my_ridge.coef_, sk_ridge.coef_, atol=1e-3,
-                                    err_msg="LỖI: Khi alpha=0, Ridge không hội tụ về nghiệm OLS!")
+        hf.assert_allclose(my_ridge.coef_, sk_ridge.coef_, atol=1e-3,
+                           err_msg="LỖI: Khi alpha=0, Ridge không hội tụ về nghiệm OLS!")
         print("✅ Test: Biên alpha = 0 (OLS nghiệm giải tích) vượt qua thành công.")
 
     def test_extreme_high_alpha_lasso(self):
@@ -78,8 +82,8 @@ class TestRidgeLassoImplementation(unittest.TestCase):
         my_model.fit(self.X, self.y)
         
         # Toàn bộ vector coefficients phải là mảng zero
-        np.testing.assert_array_equal(my_model.coef_, np.zeros(self.X.shape[1]),
-                                      err_msg="LỖI: Alpha cực lớn nhưng Lasso không ép hết các biến về 0!")
+        hf.assert_array_equal(my_model.coef_, hf.zeros(self.X.shape[1]),
+                              err_msg="LỖI: Alpha cực lớn nhưng Lasso không ép hết các biến về 0!")
         print("✅ Test: Biên alpha cực đại, toàn bộ trọng số Lasso bị triệt tiêu hoàn toàn.")
 
     def test_y_shape_resilience(self):

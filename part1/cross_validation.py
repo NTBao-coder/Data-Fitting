@@ -1,4 +1,4 @@
-import numpy as np
+from part1 import helper_function as hf
 try:
     from part1.ridge_lasso import ridge_fit, lasso_fit, predict
 except ModuleNotFoundError:
@@ -36,13 +36,13 @@ def kfold_cv(X, y, k=5, model="ols", lam=1.0):
 
     # Tạo index ngẫu nhiên để shuffle trước khi chia fold
     # Tránh bias nếu data có thứ tự (ví dụ: sorted theo salary)
-    indices = np.arange(n)
-    np.random.seed(42)
-    np.random.shuffle(indices)
+    indices = hf.arange(n)
+    hf.random_seed(42)
+    hf.random_shuffle(indices)
 
     # Chia indices thành k phần (gần) bằng nhau
-    # np.array_split tự xử lý khi n không chia hết cho k
-    folds = np.array_split(indices, k)
+    # array_split tự xử lý khi n không chia hết cho k
+    folds = hf.array_split(indices, k)
 
     fold_mses = []
 
@@ -52,7 +52,7 @@ def kfold_cv(X, y, k=5, model="ols", lam=1.0):
         val_idx = folds[i]
 
         # Các fold còn lại là train set
-        train_idx = np.concatenate([folds[j] for j in range(k) if j != i])
+        train_idx = hf.concatenate([folds[j] for j in range(k) if j != i])
 
         # Tách train / validation
         X_train, y_train = X[train_idx], y[train_idx]
@@ -75,11 +75,11 @@ def kfold_cv(X, y, k=5, model="ols", lam=1.0):
         y_hat = predict(X_val, beta)
 
         # Tính MSE của fold này
-        mse = np.mean((y_val - y_hat) ** 2)
+        mse = hf.mean((y_val - y_hat) ** 2)
         fold_mses.append(mse)
 
     # CV score = trung bình MSE qua tất cả k folds
-    cv_score = np.mean(fold_mses)
+    cv_score = hf.mean(fold_mses)
 
     return cv_score, fold_mses
 
@@ -90,7 +90,7 @@ def _ols_fit(X, y):
 
     beta = (X^T X)^{-1} X^T y
     """
-    return np.linalg.solve(X.T @ X, X.T @ y)
+    return hf.solve(X.T @ X, X.T @ y)
 
 
 def find_best_lambda(X, y, lambdas, model="ridge", k=5):
@@ -133,16 +133,16 @@ if __name__ == "__main__":
 
     from sklearn.linear_model import RidgeCV, LassoCV
 
-    np.random.seed(42)
+    hf.random_seed(42)
 
     # Tạo dữ liệu giả lập
     n, p = 200, 4
-    X = np.random.randn(n, p)
-    X = np.column_stack([np.ones(n), X])
+    X = hf.random_randn(n, p)
+    X = hf.column_stack([hf.ones(n), X])
 
     # y = 3 + 1.5x1 - 2x2 + 0.5x3 + 0*x4 + noise
-    true_beta = np.array([3.0, 1.5, -2.0, 0.5, 0.0])
-    y = X @ true_beta + np.random.randn(n) * 0.5
+    true_beta = hf.array([3.0, 1.5, -2.0, 0.5, 0.0])
+    y = X @ true_beta + hf.random_randn(n) * 0.5
 
     print("=" * 50)
     print("K-FOLD CROSS-VALIDATION DEMO")
@@ -191,7 +191,7 @@ if __name__ == "__main__":
 
     # sklearn RidgeCV dùng Leave-One-Out mặc định
     # Để so sánh apples-to-apples, dùng cv=5
-    alphas = np.array(lambdas)
+    alphas = hf.array(lambdas)
     ridge_cv_sk = RidgeCV(alphas=alphas, fit_intercept=False, cv=5)
     ridge_cv_sk.fit(X, y)
     print(f"\nSklearn RidgeCV — Best α: {ridge_cv_sk.alpha_}")

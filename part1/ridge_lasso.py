@@ -1,4 +1,4 @@
-import numpy as np
+from part1 import helper_function as hf
 
 
 def predict(X, beta):
@@ -17,7 +17,7 @@ def rss(y, y_hat):
     RSS = Σ(y - y_hat)^2
     """
 
-    return np.sum((y - y_hat) ** 2)
+    return hf.sum_values((y - y_hat) ** 2)
 
 
 def ridge_fit(X, y, lam=1.0):
@@ -35,16 +35,16 @@ def ridge_fit(X, y, lam=1.0):
     n, p = X.shape
 
     # Tạo ma trận đơn vị kích thước p x p
-    I = np.eye(p)
+    I = hf.eye(p)
 
     # Không regularize intercept
     I[0, 0] = 0
 
     # Công thức Ridge Regression
-    # Dùng np.linalg.solve thay vì inv() để ổn định số hơn
+    # Dùng solver tuyến tính thay vì inv() để ổn định số hơn
     # khi ma trận (X^T X + λI) gần singular.
     # solve(A, b) tính A^{-1} b mà không cần tính nghịch đảo tường minh.
-    beta = np.linalg.solve(X.T @ X + lam * I, X.T @ y)
+    beta = hf.solve(X.T @ X + lam * I, X.T @ y)
 
     return beta
 
@@ -93,15 +93,15 @@ def lasso_fit(X, y, lam=1.0, max_iter=1000, tol=1e-4):
     n, p = X.shape
 
     # Khởi tạo beta ban đầu = 0
-    beta = np.zeros(p)
+    beta = hf.zeros(p)
     # Khởi tạo vector dự đoán y_predict = X @ beta = 0
-    y_predict = np.zeros(n)
+    y_predict = hf.zeros(n)
 
     # Tính trước chuẩn bình phương của các cột (z_j = X_j^T X_j)
     # Tránh tính toán lại nhiều lần trong loop
-    z = np.sum(X ** 2, axis=0)
+    z = hf.sum_values(X ** 2, axis=0)
     # Tránh chia cho 0 nếu cột toàn 0
-    z = np.where(z == 0, 1e-12, z)
+    z = hf.where(z == 0, 1e-12, z)
 
     # Lặp tối đa max_iter lần
     for _ in range(max_iter):
@@ -122,7 +122,7 @@ def lasso_fit(X, y, lam=1.0, max_iter=1000, tol=1e-4):
 
             # Không regularize intercept (j = 0)
             if j == 0:
-                beta[j] = np.sum(residual) / z[j]
+                beta[j] = hf.sum_values(residual) / z[j]
             else:
                 beta[j] = soft_threshold(rho, lam) / z[j]
 
@@ -132,7 +132,7 @@ def lasso_fit(X, y, lam=1.0, max_iter=1000, tol=1e-4):
 
         # Nếu beta gần như không đổi nữa
         # thì model đã hội tụ
-        if np.linalg.norm(beta - beta_old) < tol:
+        if hf.norm(beta - beta_old) < tol:
             break
 
     return beta
@@ -161,34 +161,37 @@ def vif(X):
 
         # Xóa feature j khỏi dataset
         # để dùng các feature còn lại predict nó
-        X_rest = np.delete(X, j, axis=1)
+        X_rest = hf.delete(X, j, axis=1)
 
         try:
             # Fit OLS:
             # X_rest -> y_j
-            # Thay thế np.linalg.lstsq bằng np.linalg.solve để tuân thủ Constraint 1
+            # Thay thế lstsq bằng solver tuyến tính để tuân thủ Constraint 1
             XTX = X_rest.T @ X_rest
             XTy = X_rest.T @ y_j
-            beta = np.linalg.solve(XTX, XTy)
+            beta = hf.solve(XTX, XTy)
 
             # Prediction của feature j
             y_hat = predict(X_rest, beta)
 
             # Tính R^2
-            r2 = 1 - (np.sum((y_j - y_hat) ** 2) / np.sum((y_j - np.mean(y_j)) ** 2))
+            r2 = 1 - (
+                hf.sum_values((y_j - y_hat) ** 2)
+                / hf.sum_values((y_j - hf.mean(y_j)) ** 2)
+            )
 
             # Tránh chia cho 0 nếu R^2 ≈ 1
-            if np.isclose(r2, 1) or r2 >= 1.0:
-                vif_values.append(np.inf)
+            if hf.is_close(r2, 1) or r2 >= 1.0:
+                vif_values.append(hf.INF)
             else:
                 # Công thức:
                 # VIF = 1 / (1 - R^2)
                 vif_values.append(1 / (1 - r2))
-        except np.linalg.LinAlgError:
+        except hf.LinAlgError:
             # Nếu ma trận kì dị, VIF là vô cùng
-            vif_values.append(np.inf)
+            vif_values.append(hf.INF)
 
-    return np.array(vif_values)
+    return hf.array(vif_values)
 
 # =========================================================
 # Demo / Testing Section
@@ -203,22 +206,22 @@ if __name__ == "__main__":
     from sklearn.linear_model import Lasso
 
     # Đặt seed để kết quả random có thể reproducible
-    np.random.seed(42)
+    hf.random_seed(42)
 
     # Tạo dữ liệu giả lập:
     # 100 samples, 3 features
-    X = np.random.randn(100, 3)
+    X = hf.random_randn(100, 3)
 
     # Thêm intercept column (cột toàn số 1)
-    X = np.column_stack([np.ones(100), X])
+    X = hf.column_stack([hf.ones(100), X])
 
     # Beta thật dùng để sinh dữ liệu
     # y = 5 + 2x1 - 3x2 + x3 + noise
-    true_beta = np.array([5, 2, -3, 1])
+    true_beta = hf.array([5, 2, -3, 1])
 
     # Sinh target y
     # thêm noise để giống dữ liệu thực tế
-    y = X @ true_beta + np.random.randn(100)
+    y = X @ true_beta + hf.random_randn(100)
 
     # =========================
     # CUSTOM IMPLEMENTATION

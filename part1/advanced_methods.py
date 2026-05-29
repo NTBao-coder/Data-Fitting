@@ -1,4 +1,4 @@
-import numpy as np
+from part1 import helper_function as hf
 
 try:
     from part1.ridge_lasso import soft_threshold, predict
@@ -18,12 +18,12 @@ def elastic_net_fit(X, y, l1_ratio=0.5, alpha=1.0, max_iter=1000, tol=1e-4):
     Lưu ý: Không phạt (regularize) intercept (cột đầu tiên).
     """
     n, p = X.shape
-    beta = np.zeros(p)
-    y_predict = np.zeros(n)
+    beta = hf.zeros(p)
+    y_predict = hf.zeros(n)
 
     # Tính trước chuẩn bình phương của các cột (z_j = X_j^T X_j)
-    z = np.sum(X ** 2, axis=0)
-    z = np.where(z == 0, 1e-12, z)
+    z = hf.sum_values(X ** 2, axis=0)
+    z = hf.where(z == 0, 1e-12, z)
 
     lam1 = alpha * l1_ratio
     lam2 = alpha * (1 - l1_ratio)
@@ -41,7 +41,7 @@ def elastic_net_fit(X, y, l1_ratio=0.5, alpha=1.0, max_iter=1000, tol=1e-4):
 
             # Không regularize intercept
             if j == 0:
-                beta[j] = np.sum(residual) / z[j]
+                beta[j] = hf.sum_values(residual) / z[j]
             else:
                 beta[j] = soft_threshold(rho, lam1) / (z[j] + lam2)
 
@@ -50,7 +50,7 @@ def elastic_net_fit(X, y, l1_ratio=0.5, alpha=1.0, max_iter=1000, tol=1e-4):
                 y_predict += X[:, j] * (beta[j] - beta_old_j)
 
         # Kiểm tra hội tụ
-        if np.linalg.norm(beta - beta_old) < tol:
+        if hf.norm(beta - beta_old) < tol:
             break
 
     return beta
@@ -67,21 +67,21 @@ def huber_irls_fit(X, y, delta=1.345, max_iter=100, tol=1e-5):
     
     # Khởi động beta bằng OLS ban đầu
     try:
-        beta = np.linalg.solve(X.T @ X, X.T @ y)
-    except np.linalg.LinAlgError:
-        beta = np.zeros(p)
+        beta = hf.solve(X.T @ X, X.T @ y)
+    except hf.LinAlgError:
+        beta = hf.zeros(p)
 
     for _ in range(max_iter):
         beta_old = beta.copy()
         
         # Tính residuals
         residuals = y - X @ beta
-        abs_res = np.abs(residuals)
+        abs_res = hf.absolute(residuals)
         
         # Tính trọng số w_i cho từng dòng
         # Tránh chia cho 0
-        abs_res_safe = np.where(abs_res == 0, 1e-12, abs_res)
-        w = np.where(abs_res_safe <= delta, 1.0, delta / abs_res_safe)
+        abs_res_safe = hf.where(abs_res == 0, 1e-12, abs_res)
+        w = hf.where(abs_res_safe <= delta, 1.0, delta / abs_res_safe)
         
         # Thực hiện weighted OLS: beta = (X^T W X)^(-1) X^T W y
         # Để tối ưu hóa nhân trực tiếp:
@@ -91,12 +91,12 @@ def huber_irls_fit(X, y, delta=1.345, max_iter=100, tol=1e-5):
         XTWy = X.T @ (w * y)
         
         try:
-            beta = np.linalg.solve(XTWX, XTWy)
-        except np.linalg.LinAlgError:
+            beta = hf.solve(XTWX, XTWy)
+        except hf.LinAlgError:
             # Thêm ridge nhỏ nếu ma trận bị suy biến
-            beta = np.linalg.solve(XTWX + 1e-6 * np.eye(p), XTWy)
+            beta = hf.solve(XTWX + 1e-6 * hf.eye(p), XTWy)
 
-        if np.linalg.norm(beta - beta_old) < tol:
+        if hf.norm(beta - beta_old) < tol:
             break
 
     return beta
@@ -117,8 +117,8 @@ def bayesian_linear_fit(X, y, alpha=1.0, beta_n=1.0):
     
     # Covariance matrix: Sigma_N = (alpha * I + beta_n * X^T X)^(-1)
     XTX = X.T @ X
-    A = alpha * np.eye(p) + beta_n * XTX
-    Sigma_N = np.linalg.inv(A)
+    A = alpha * hf.eye(p) + beta_n * XTX
+    Sigma_N = hf.inverse(A)
     
     # Mean vector: mu_N = beta_n * Sigma_N @ X.T @ y
     mu_N = beta_n * Sigma_N @ X.T @ y

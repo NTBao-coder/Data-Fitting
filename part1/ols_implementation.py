@@ -9,40 +9,13 @@ from __future__ import annotations
 
 from typing import Dict, Tuple
 
-import numpy as np
 import pandas as pd
 from scipy import stats
 
-
-def _as_1d_float_array(values: np.ndarray, name: str) -> np.ndarray:
-    """Convert a vector-like input to a 1D float array."""
-    array = np.asarray(values, dtype=float)
-    if array.ndim == 2 and array.shape[1] == 1:
-        array = array.ravel()
-    if array.ndim != 1:
-        raise ValueError(f"{name} must be a 1D array or a 2D column vector.")
-    return array
+from part1 import helper_function as hf
 
 
-def _as_2d_float_array(values: np.ndarray, name: str) -> np.ndarray:
-    """Convert a matrix-like input to a 2D float array."""
-    array = np.asarray(values, dtype=float)
-    if array.ndim != 2:
-        raise ValueError(f"{name} must be a 2D array.")
-    return array
-
-
-def _validate_regression_shapes(X: np.ndarray, y: np.ndarray) -> tuple[int, int]:
-    """Validate common OLS input dimensions and return ``(n, p)``."""
-    n_samples, n_features = X.shape
-    if y.shape[0] != n_samples:
-        raise ValueError("X and y must contain the same number of samples.")
-    if n_samples <= n_features:
-        raise ValueError("OLS requires n_samples > n_features for sigma2 inference.")
-    return n_samples, n_features
-
-
-def ols_fit(X: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, float]:
+def ols_fit(X: hf.Array, y: hf.Array) -> Tuple[hf.Array, float]:
     """
     Estimate OLS coefficients and residual variance.
 
@@ -52,24 +25,24 @@ def ols_fit(X: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, float]:
 
     Parameters
     ----------
-    X : np.ndarray
+    X : array-like
         Design matrix with shape (n_samples, n_features). Include an intercept
         column before calling this function if the model needs one.
-    y : np.ndarray
+    y : array-like
         Target vector with shape (n_samples,) or (n_samples, 1).
 
     Returns
     -------
-    Tuple[np.ndarray, float]
+    Tuple[array, float]
         Estimated coefficients with shape (n_features,) and unbiased residual
         variance estimate.
     """
-    X = _as_2d_float_array(X, "X")
-    y = _as_1d_float_array(y, "y")
-    n_samples, n_features = _validate_regression_shapes(X, y)
+    X = hf.as_2d_float_array(X, "X")
+    y = hf.as_1d_float_array(y, "y")
+    n_samples, n_features = hf.validate_regression_shapes(X, y)
 
     XTX = X.T @ X
-    beta_hat = np.linalg.inv(XTX) @ X.T @ y
+    beta_hat = hf.inverse(XTX) @ X.T @ y
     residuals = y - X @ beta_hat
     rss = residuals.T @ residuals
     sigma_squared = rss / (n_samples - n_features)
@@ -77,7 +50,7 @@ def ols_fit(X: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, float]:
     return beta_hat, float(sigma_squared)
 
 
-def hat_matrix(X: np.ndarray) -> np.ndarray:
+def hat_matrix(X: hf.Array) -> hf.Array:
     """
     Compute the OLS hat matrix.
 
@@ -93,28 +66,28 @@ def hat_matrix(X: np.ndarray) -> np.ndarray:
 
     Parameters
     ----------
-    X : np.ndarray
+    X : array-like
         Design matrix with shape (n_samples, n_features).
 
     Returns
     -------
-    np.ndarray
+    array
         Hat matrix with shape (n_samples, n_samples).
     """
-    X = _as_2d_float_array(X, "X")
+    X = hf.as_2d_float_array(X, "X")
     n_samples, n_features = X.shape
     if n_samples < n_features:
         raise ValueError("X must have n_samples >= n_features.")
 
-    H = X @ np.linalg.inv(X.T @ X) @ X.T
+    H = X @ hf.inverse(X.T @ X) @ X.T
 
-    assert np.allclose(H.T, H, atol=1e-8), "Hat matrix must be symmetric."
-    assert np.allclose(H @ H, H, atol=1e-8), "Hat matrix must be idempotent."
+    assert hf.all_close(H.T, H, atol=1e-8), "Hat matrix must be symmetric."
+    assert hf.all_close(H @ H, H, atol=1e-8), "Hat matrix must be idempotent."
 
     return H
 
 
-def model_metrics(y: np.ndarray, y_hat: np.ndarray, p: int) -> Dict[str, float]:
+def model_metrics(y: hf.Array, y_hat: hf.Array, p: int) -> Dict[str, float]:
     """
     Compute common OLS model metrics.
 
@@ -127,9 +100,9 @@ def model_metrics(y: np.ndarray, y_hat: np.ndarray, p: int) -> Dict[str, float]:
 
     Parameters
     ----------
-    y : np.ndarray
+    y : array-like
         Observed target values.
-    y_hat : np.ndarray
+    y_hat : array-like
         Fitted target values.
     p : int
         Number of coefficients, including the intercept.
@@ -139,8 +112,8 @@ def model_metrics(y: np.ndarray, y_hat: np.ndarray, p: int) -> Dict[str, float]:
     Dict[str, float]
         RSS, TSS, R2, adjusted R2, and F-statistic.
     """
-    y = _as_1d_float_array(y, "y")
-    y_hat = _as_1d_float_array(y_hat, "y_hat")
+    y = hf.as_1d_float_array(y, "y")
+    y_hat = hf.as_1d_float_array(y_hat, "y_hat")
 
     if y.shape != y_hat.shape:
         raise ValueError("y and y_hat must have the same shape.")
@@ -152,19 +125,19 @@ def model_metrics(y: np.ndarray, y_hat: np.ndarray, p: int) -> Dict[str, float]:
         raise ValueError("n_samples must be greater than p.")
 
     residuals = y - y_hat
-    centered_y = y - np.mean(y)
+    centered_y = y - hf.mean(y)
     rss = float(residuals.T @ residuals)
     tss = float(centered_y.T @ centered_y)
 
-    if np.isclose(tss, 0.0):
-        r_squared = np.nan
-        adjusted_r_squared = np.nan
-        f_statistic = np.nan
+    if hf.is_close(tss, 0.0):
+        r_squared = hf.NAN
+        adjusted_r_squared = hf.NAN
+        f_statistic = hf.NAN
     else:
         r_squared = 1.0 - rss / tss
         adjusted_r_squared = 1.0 - (rss / (n_samples - p)) / (tss / (n_samples - 1))
-        if p == 1 or np.isclose(rss, 0.0):
-            f_statistic = np.inf
+        if p == 1 or hf.is_close(rss, 0.0):
+            f_statistic = hf.INF
         else:
             f_statistic = ((tss - rss) / (p - 1)) / (rss / (n_samples - p))
 
@@ -178,9 +151,9 @@ def model_metrics(y: np.ndarray, y_hat: np.ndarray, p: int) -> Dict[str, float]:
 
 
 def coef_inference(
-    X: np.ndarray,
-    y: np.ndarray,
-    beta_hat: np.ndarray,
+    X: hf.Array,
+    y: hf.Array,
+    beta_hat: hf.Array,
     sigma2: float,
 ) -> pd.DataFrame:
     """
@@ -195,11 +168,11 @@ def coef_inference(
 
     Parameters
     ----------
-    X : np.ndarray
+    X : array-like
         Design matrix with shape (n_samples, n_features).
-    y : np.ndarray
+    y : array-like
         Target vector with shape (n_samples,) or (n_samples, 1).
-    beta_hat : np.ndarray
+    beta_hat : array-like
         Estimated coefficients with shape (n_features,).
     sigma2 : float
         Estimated residual variance.
@@ -210,10 +183,10 @@ def coef_inference(
         Table with coefficient, standard error, t-statistic, p-value, and 95%
         confidence interval columns.
     """
-    X = _as_2d_float_array(X, "X")
-    y = _as_1d_float_array(y, "y")
-    beta_hat = _as_1d_float_array(beta_hat, "beta_hat")
-    n_samples, n_features = _validate_regression_shapes(X, y)
+    X = hf.as_2d_float_array(X, "X")
+    y = hf.as_1d_float_array(y, "y")
+    beta_hat = hf.as_1d_float_array(beta_hat, "beta_hat")
+    n_samples, n_features = hf.validate_regression_shapes(X, y)
 
     if beta_hat.shape[0] != n_features:
         raise ValueError("beta_hat length must match X.shape[1].")
@@ -221,15 +194,15 @@ def coef_inference(
         raise ValueError("sigma2 must be non-negative.")
 
     df_resid = n_samples - n_features
-    cov_beta = sigma2 * np.linalg.inv(X.T @ X)
-    std_error = np.sqrt(np.diag(cov_beta))
-    t_stat = np.divide(
+    cov_beta = sigma2 * hf.inverse(X.T @ X)
+    std_error = hf.sqrt(hf.diagonal(cov_beta))
+    t_stat = hf.divide(
         beta_hat,
         std_error,
-        out=np.full_like(beta_hat, np.nan, dtype=float),
+        out=hf.full_like(beta_hat, hf.NAN, dtype=float),
         where=std_error > 0,
     )
-    p_value = 2.0 * (1.0 - stats.t.cdf(np.abs(t_stat), df=df_resid))
+    p_value = 2.0 * (1.0 - stats.t.cdf(hf.absolute(t_stat), df=df_resid))
     t_critical = stats.t.ppf(0.975, df=df_resid)
     ci_lower = beta_hat - t_critical * std_error
     ci_upper = beta_hat + t_critical * std_error

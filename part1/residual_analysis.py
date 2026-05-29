@@ -5,36 +5,18 @@ from __future__ import annotations
 from typing import Dict
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import seaborn as sns
 from scipy import stats
 
+from part1 import helper_function as hf
 from part1.ols_implementation import hat_matrix
 
 
-def _as_1d_float_array(values: np.ndarray, name: str) -> np.ndarray:
-    """Convert a vector-like input to a 1D float array."""
-    array = np.asarray(values, dtype=float)
-    if array.ndim == 2 and array.shape[1] == 1:
-        array = array.ravel()
-    if array.ndim != 1:
-        raise ValueError(f"{name} must be a 1D array or a 2D column vector.")
-    return array
-
-
-def _as_2d_float_array(values: np.ndarray, name: str) -> np.ndarray:
-    """Convert a matrix-like input to a 2D float array."""
-    array = np.asarray(values, dtype=float)
-    if array.ndim != 2:
-        raise ValueError(f"{name} must be a 2D array.")
-    return array
-
-
 def residual_plots(
-    X: np.ndarray,
-    y: np.ndarray,
-    beta_hat: np.ndarray,
+    X: hf.Array,
+    y: hf.Array,
+    beta_hat: hf.Array,
 ) -> plt.Figure:
     """
     Create four standard OLS diagnostic plots.
@@ -47,11 +29,11 @@ def residual_plots(
 
     Parameters
     ----------
-    X : np.ndarray
+    X : array-like
         Design matrix with shape (n_samples, n_features).
-    y : np.ndarray
+    y : array-like
         Target vector with shape (n_samples,) or (n_samples, 1).
-    beta_hat : np.ndarray
+    beta_hat : array-like
         Estimated coefficients with shape (n_features,).
 
     Returns
@@ -59,9 +41,9 @@ def residual_plots(
     matplotlib.figure.Figure
         Figure containing the four diagnostic subplots.
     """
-    X = _as_2d_float_array(X, "X")
-    y = _as_1d_float_array(y, "y")
-    beta_hat = _as_1d_float_array(beta_hat, "beta_hat")
+    X = hf.as_2d_float_array(X, "X")
+    y = hf.as_1d_float_array(y, "y")
+    beta_hat = hf.as_1d_float_array(beta_hat, "beta_hat")
 
     n_samples, n_features = X.shape
     if y.shape[0] != n_samples:
@@ -73,22 +55,22 @@ def residual_plots(
 
     y_hat = X @ beta_hat
     residuals = y - y_hat
-    leverage = np.diag(hat_matrix(X))
+    leverage = hf.diagonal(hat_matrix(X))
     rss = residuals.T @ residuals
     mse = rss / (n_samples - n_features)
 
-    leverage_complement = np.clip(1.0 - leverage, 1e-12, None)
-    if np.isclose(mse, 0.0):
-        standardized_residuals = np.zeros_like(residuals, dtype=float)
+    leverage_complement = hf.clip(1.0 - leverage, 1e-12, None)
+    if hf.is_close(mse, 0.0):
+        standardized_residuals = hf.zeros_like(residuals, dtype=float)
     else:
-        standardized_residuals = residuals / np.sqrt(mse * leverage_complement)
+        standardized_residuals = residuals / hf.sqrt(mse * leverage_complement)
 
-    scale_location = np.sqrt(np.abs(standardized_residuals))
+    scale_location = hf.sqrt(hf.absolute(standardized_residuals))
     cooks_distance = (
         (standardized_residuals**2 / n_features)
         * (leverage / leverage_complement)
     )
-    observation_index = np.arange(n_samples)
+    observation_index = hf.arange(n_samples)
 
     sns.set_theme(style="whitegrid")
     fig, axes = plt.subplots(2, 2, figsize=(12, 9))
@@ -119,8 +101,8 @@ def residual_plots(
 def monte_carlo_gauss_markov(
     n_simulations: int,
     n_samples: int,
-    true_beta: np.ndarray,
-) -> Dict[str, np.ndarray | pd.DataFrame]:
+    true_beta: hf.Array,
+) -> Dict[str, hf.Array | pd.DataFrame]:
     """
     Run a vectorized Monte Carlo simulation to demonstrate OLS unbiasedness.
 
@@ -134,16 +116,16 @@ def monte_carlo_gauss_markov(
         Number of simulated datasets.
     n_samples : int
         Number of observations in each simulated dataset.
-    true_beta : np.ndarray
+    true_beta : array-like
         True coefficients. The first coefficient is treated as the intercept.
 
     Returns
     -------
-    Dict[str, np.ndarray | pd.DataFrame]
+    Dict[str, array | pd.DataFrame]
         Contains all beta estimates, empirical mean estimates, empirical bias,
         and a summary table.
     """
-    true_beta = _as_1d_float_array(true_beta, "true_beta")
+    true_beta = hf.as_1d_float_array(true_beta, "true_beta")
 
     if n_simulations <= 0:
         raise ValueError("n_simulations must be positive.")
@@ -154,20 +136,20 @@ def monte_carlo_gauss_markov(
     if n_samples <= n_features:
         raise ValueError("n_samples must be greater than len(true_beta).")
 
-    non_intercept_features = np.random.normal(
+    non_intercept_features = hf.random_normal(
         loc=0.0,
         scale=1.0,
         size=(n_simulations, n_samples, n_features - 1),
     )
-    intercept = np.ones((n_simulations, n_samples, 1), dtype=float)
-    X = np.concatenate((intercept, non_intercept_features), axis=2)
-    epsilon = np.random.normal(loc=0.0, scale=1.0, size=(n_simulations, n_samples))
+    intercept = hf.ones((n_simulations, n_samples, 1), dtype=float)
+    X = hf.concatenate([intercept, non_intercept_features], axis=2)
+    epsilon = hf.random_normal(loc=0.0, scale=1.0, size=(n_simulations, n_samples))
     y = X @ true_beta + epsilon
 
-    XT = np.swapaxes(X, 1, 2)
+    XT = hf.swapaxes(X, 1, 2)
     XTX = XT @ X
     XTy = XT @ y[..., None]
-    beta_hats = (np.linalg.inv(XTX) @ XTy).squeeze(axis=2)
+    beta_hats = (hf.inverse(XTX) @ XTy).squeeze(axis=2)
 
     beta_mean = beta_hats.mean(axis=0)
     beta_bias = beta_mean - true_beta
