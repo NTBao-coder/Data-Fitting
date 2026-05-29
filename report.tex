@@ -1,0 +1,101 @@
+\section*{PHẦN 2: ỨNG DỤNG DATA FITTING VÀO DỮ LIỆU THỰC TẾ}
+
+\subsection*{1. Cơ sở lý thuyết:}
+
+\subsection*{2. Áp dụng Data Fitting vào dữ liệu:}
+
+\subsubsection*{2.1. Tìm dữ liệu:}
+
+\begin{itemize}
+    \item Nguồn dữ liệu: \url{https://www.kaggle.com/datasets/jamiewelsh2/nba-player-salaries-2022-23-season}
+    \item Thông tin cơ bản của dữ liệu: Dữ liệu về lương và thông số của các cầu thủ trong giải đấu bóng rổ nhà nghề Mỹ (NBA), mùa giải 2022 – 2023.
+    \item Merge dữ liệu: Dữ liệu của \textbf{file .csv} trên Kaggle chỉ chứa thông tin chủ yếu về tiền lương và một vài thông số khác, tuy nhiên, không chứa đủ và không cập nhật các thông số về chỉ số của các cầu thủ ấy trên sân. Dữ liệu trên \textbf{nba\_api} lại chứa các chỉ số thi đấu trên sân nhưng không công bố về tiền lương. Vì thế, để nguồn dữ liệu được đầy đủ và để làm cho mô hình chính xác hơn, cần hợp nhất 2 file với nhau.
+\end{itemize}
+
+\subsubsection*{2.2. Thông số dữ liệu:}
+
+\paragraph*{2.2.1. Quy mô dữ liệu:} Bộ dữ liệu trên gồm 467 quan trắc (467 cầu thủ) tương ứng với 467 dòng, 51 đặc trưng (cột) tương ứng với 51 cột. Ý nghĩa của từng cột:
+
+\begin{itemize}
+    \item \textbf{Player Name}: Tên cầu thủ.
+    \item \textbf{Position}: Vị trí thi đấu (PG, SG, PF, C...).
+    \item \textbf{Salary}: Mức lương tính bằng USD.
+    \item \textbf{Team}: Đội bóng chủ quản.
+    \item \textbf{Age}: Tuổi của cầu thủ (thường tỉ lệ thuận với kinh nghiệm và lương).
+    \item \textbf{GP (Games Played)}: Số trận đã thi đấu.
+    \item \textbf{GS (Games Started)}: Số trận đá chính.
+    \item \textbf{MP (Minutes Played)}: Số phút thi đấu mỗi trận.
+    \item \textbf{FG, FGA, FG\%}: Các chỉ số về cú ném thành công và tỉ lệ ném chính xác.
+    \item \textbf{3P, 3PA, 3P\%}: Các chỉ số về ném 3 điểm.
+    \item \textbf{2P, 2PA, 2P\%}: Các chỉ số về ném 2 điểm.
+    \item \textbf{eFG\%}: Tỉ lệ ném rổ hiệu quả.
+    \item \textbf{FT, FTA, FT\%}: Các chỉ số về ném phạt.
+    \item \textbf{ORB, DRB, TRB}: Các chỉ số về bắt bóng bật bảng (Rebounds): Rebounds tấn công, Rebounds phòng thủ, tổng số Rebounds.
+    \item \textbf{AST}: Kiến tạo.
+    \item \textbf{STL}: Cướp bóng.
+    \item \textbf{BLK}: Chắn bóng.
+    \item \textbf{TOV}: Mất bóng.
+    \item \textbf{PF}: Cầu thủ tiên phong chính.
+    \item \textbf{PTS}: Điểm số ghi được trung bình mỗi trận.
+    \item \textbf{Total Minute}: Số phút đã chơi.
+    \item \textbf{PER}: Chỉ số hiệu quả (số lần chơi tích cực trừ đi số sai lầm).
+    \item \textbf{TS\%}: Tỉ lệ ném bóng thực tế.
+    \item \textbf{USG\%}: Tỉ lệ sử dụng bóng.
+    \item \textbf{WS}: Số trận thắng có đóng góp của cầu thủ.
+    \item \textbf{BPM (Box Plus/Minus)}: Điểm mà cầu thủ tạo ra cho mỗi 100 lần kiểm soát bóng.
+    \item \textbf{VORP}: Giá trị đóng góp của 1 cầu thủ với 1 cầu thủ dự bị.
+\end{itemize}
+
+Trong các biến này, ta chọn \textbf{biến mục tiêu} là \textbf{Salary} – Lương của cầu thủ. Các biến còn lại sẽ là biến đầu vào.
+
+\paragraph*{2.2.2. Khảo sát, phân tích dữ liệu}
+
+\textbf{2.2.2.1. Merge file dữ liệu từ Kaggle với nba\_api:}
+\begin{itemize}
+    \item Mục đích: Để có đầy đủ thông tin về chỉ số và mức lương của một cầu thủ, tạo thành một bộ dữ liệu hoàn chỉnh để xử lý.
+    \item Thiết lập: Trong file \texttt{fetch\_and\_merge.py}, xây dựng hàm \texttt{build\_raw\_dataset()}: Lấy dữ liệu từ \texttt{nba\_api} $\rightarrow$ Đọc dữ liệu của file .csv lấy từ Kaggle $\rightarrow$ Hợp nhất dữ liệu giữa 2 file bằng phép Inner Join.
+\end{itemize}
+
+\textbf{2.2.2.2. Kiểm tra và xử lý dữ liệu bị trùng lặp và nhiễu:}
+\begin{itemize}
+    \item Mục đích: Loại bỏ các cầu thủ có dữ liệu trùng lặp và dữ liệu nhiễu (các cầu thủ thi đấu quá ít trận hoặc quá ít số phút) để làm cho dữ liệu sạch và dễ xử lý hơn.
+    \item Thiết lập: Trong file \texttt{fetch\_and\_merge.py}, xây dựng hàm \texttt{build\_raw\_dataset()}: Loại bỏ các dòng trùng lặp dựa trên tên cầu thủ $\rightarrow$ Lọc dữ liệu nhiễu (loại bỏ các cầu thủ thi đấu ít hơn 5 trận hoặc ít hơn 50 phút, vì các cầu thủ này thường sẽ không đóng góp nhiều vào trong giải đấu nên nếu thêm vào sẽ gây nhiễu dữ liệu).
+\end{itemize}
+
+\textbf{2.2.2.3. Thực hiện EDA cho dữ liệu:}
+\begin{itemize}
+    \item Mục đích: Hiểu rõ hơn về dữ liệu, các đặc trưng của dữ liệu và mối quan hệ giữa các biến số trong dữ liệu, từ đó đưa ra những nhận định và quyết định đúng đắn trong việc xử lý dữ liệu và xây dựng mô hình.
+\end{itemize}
+
+\textit{a. Phân tích kích thước dữ liệu và tỉ lệ missing values:}
+\begin{itemize}
+    \item Trong file \texttt{part2\_notebook.ipynb}, sử dụng hàm \texttt{df.shape} để thống kê kích thước dữ liệu (số dòng và số cột); sử dụng hàm \texttt{.isnull().mean()} để thống kê tỉ lệ missing values cho từng biến.
+    \item Dùng hàm \texttt{sns.histplot()} để trực quan phân phối mức lương. Dựa vào biểu đồ, ta thấy rằng mức lương của các cầu thủ có sự chênh lệch đáng kể, không có sự phân phối chuẩn hay đều. Tuy nhiên, nếu lấy logarit của mức lương, ta sẽ được sự phân phối gần như chuẩn.
+\end{itemize}
+$\rightarrow$ Kết luận: Việc đưa biến mục tiêu (Salary) về dạng logarit sẽ đưa phân phối về dạng gần chuẩn, làm giảm sự chênh lệch mức lương giữa các cầu thủ và giúp mô hình dự đoán chính xác hơn.
+
+\textit{b. Thống kê mô tả:} mean, median, min, max, std, quartiles (25\%, 50\%, 75\%).
+\begin{itemize}
+    \item Trong file \texttt{part2\_notebook.ipynb}, sử dụng hàm \texttt{df.describe()} để thống kê mô tả các biến số trong dữ liệu. Hàm này sẽ trả về các thông số cần thiết trong thống kê mô tả.
+\end{itemize}
+
+\textit{c. Phân phối từng biến:} Vẽ histogram và boxplot cho các biến số trong dữ liệu. Một vài biến ảnh hưởng tới biến mục tiêu (Salary):
+\begin{itemize}
+    \item Age: Có phân phối lệch trái, cho thấy tuổi càng thấp càng có lương cao, tuy nhiên không có sự chênh lệch lớn.
+    \item GP: Có phân phối hơi lệch trái, cho thấy đa số cầu thủ sẽ chơi nhiều trận đấu để cống hiến cho đội bóng. Một vài cầu thủ do chấn thương hoặc các lý do khác nên số trận đấu không nhiều.
+    \item MP: Có phân phối đối xứng gần chuẩn, cho thấy thời gian thi đấu của các cầu thủ khá đồng đều, trải dài từ khoảng hơn 5 phút - gần 40 phút.
+    \item PTS: Có phân phối lệch phải, cho thấy số điểm tập trung nhiều ở mức từ 0 - 10 điểm, rất ít cầu thủ ghi được nhiều điểm mỗi trận.
+\end{itemize}
+
+\textit{d. Ma trận tương quan (heatmap):}
+\begin{itemize}
+    \item Trong file \texttt{part2\_notebook.ipynb}, sử dụng hàm \texttt{sns.heatmap()} để trực quan ma trận tương quan, với tham số \texttt{annot=True} để hiển thị giá trị tương quan trên mỗi ô, \texttt{cmap='coolwarm'} để tô màu theo giá trị tương quan (từ -1 đến 1).
+    \item Nhận xét:
+    \begin{itemize}
+        \item Ma trận này là một ma trận đối xứng qua đường chéo chính (đường chéo gồm toàn giá trị 1.0).
+        \item Thang độ màu chạy từ $-1.0$ (đỏ đậm - tương quan nghịch biến hoàn toàn) đến $1.0$ (xanh đậm - tương quan đồng biến hoàn toàn). Các vùng màu nhạt (gần mức $0.0$) thể hiện hai biến độc lập hoặc có quan hệ tuyến tính rất yếu.
+        \item Dựa vào ma trận, ta có thể thấy một vài biến có độ tương quan yếu với biến mục tiêu Salary (FG\%, 3P\%, 2P\%, ...); những biến có độ tương quan mạnh với nhau - hay còn gọi là đa cộng tuyến (ví dụ: GP và GS, 3P và 3PA, 2P và 2PA, ...). Sự tồn tại của các cặp biến có độ tương quan cực cao này sẽ làm cho ma trận $X^T X$ gần suy biến, khiến phương sai của các hệ số ước lượng $\hat{\beta}$ tăng. Do đó, nhóm dự kiến sẽ thực hiện loại bỏ các cột không cần thiết và có tương quan cao với nhau để làm giảm đa cộng tuyến, cũng như làm cho ma trận tương quan trở nên dễ nhìn và dễ phân tích hơn.
+    \end{itemize}
+\end{itemize}
+
+\textbf{2.3. Tiền xử lý dữ liệu:}
