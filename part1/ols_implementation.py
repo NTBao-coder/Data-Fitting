@@ -1,8 +1,8 @@
 """Core Ordinary Least Squares implementation.
 
-The functions in this module implement the OLS normal-equation workflow with
-NumPy matrix operations. The design matrix ``X`` is assumed to already include
-an intercept column when the model requires one.
+The functions in this module implement the OLS normal-equation workflow. The
+design matrix ``X`` is assumed to already include an intercept column when the
+model requires one.
 """
 
 from __future__ import annotations
@@ -41,10 +41,11 @@ def ols_fit(X: hf.Array, y: hf.Array) -> Tuple[hf.Array, float]:
     y = hf.as_1d_float_array(y, "y")
     n_samples, n_features = hf.validate_regression_shapes(X, y)
 
-    XTX = X.T @ X
-    beta_hat = hf.inverse(XTX) @ X.T @ y
-    residuals = y - X @ beta_hat
-    rss = residuals.T @ residuals
+    XT = hf.transpose(X)
+    XTX = hf.matmul(XT, X)
+    beta_hat = hf.matmul(hf.matmul(hf.inverse(XTX), XT), y)
+    residuals = hf.subtract(y, hf.matmul(X, beta_hat))
+    rss = hf.dot(residuals, residuals)
     sigma_squared = rss / (n_samples - n_features)
 
     return beta_hat, float(sigma_squared)
@@ -79,10 +80,11 @@ def hat_matrix(X: hf.Array) -> hf.Array:
     if n_samples < n_features:
         raise ValueError("X must have n_samples >= n_features.")
 
-    H = X @ hf.inverse(X.T @ X) @ X.T
+    XT = hf.transpose(X)
+    H = hf.matmul(hf.matmul(X, hf.inverse(hf.matmul(XT, X))), XT)
 
-    assert hf.all_close(H.T, H, atol=1e-8), "Hat matrix must be symmetric."
-    assert hf.all_close(H @ H, H, atol=1e-8), "Hat matrix must be idempotent."
+    assert hf.all_close(hf.transpose(H), H, atol=1e-8), "Hat matrix must be symmetric."
+    assert hf.all_close(hf.matmul(H, H), H, atol=1e-8), "Hat matrix must be idempotent."
 
     return H
 
@@ -124,10 +126,10 @@ def model_metrics(y: hf.Array, y_hat: hf.Array, p: int) -> Dict[str, float]:
     if n_samples <= p:
         raise ValueError("n_samples must be greater than p.")
 
-    residuals = y - y_hat
-    centered_y = y - hf.mean(y)
-    rss = float(residuals.T @ residuals)
-    tss = float(centered_y.T @ centered_y)
+    residuals = hf.subtract(y, y_hat)
+    centered_y = hf.subtract(y, hf.mean(y))
+    rss = float(hf.dot(residuals, residuals))
+    tss = float(hf.dot(centered_y, centered_y))
 
     if hf.is_close(tss, 0.0):
         r_squared = hf.NAN
@@ -194,18 +196,19 @@ def coef_inference(
         raise ValueError("sigma2 must be non-negative.")
 
     df_resid = n_samples - n_features
-    cov_beta = sigma2 * hf.inverse(X.T @ X)
+    XT = hf.transpose(X)
+    cov_beta = hf.scalar_multiply(hf.inverse(hf.matmul(XT, X)), sigma2)
     std_error = hf.sqrt(hf.diagonal(cov_beta))
     t_stat = hf.divide(
         beta_hat,
         std_error,
         out=hf.full_like(beta_hat, hf.NAN, dtype=float),
-        where=std_error > 0,
+        where=[value > 0 for value in std_error],
     )
     p_value = 2.0 * (1.0 - stats.t.cdf(hf.absolute(t_stat), df=df_resid))
     t_critical = stats.t.ppf(0.975, df=df_resid)
-    ci_lower = beta_hat - t_critical * std_error
-    ci_upper = beta_hat + t_critical * std_error
+    ci_lower = hf.subtract(beta_hat, hf.scalar_multiply(std_error, t_critical))
+    ci_upper = hf.add(beta_hat, hf.scalar_multiply(std_error, t_critical))
 
     return pd.DataFrame(
         {

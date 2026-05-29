@@ -7,7 +7,9 @@ def predict(X, beta):
     y_hat = X @ beta
     """
 
-    return X @ beta
+    X = hf.as_2d_float_array(X, "X")
+    beta = hf.as_1d_float_array(beta, "beta")
+    return hf.matmul(X, beta)
 
 
 def rss(y, y_hat):
@@ -17,7 +19,9 @@ def rss(y, y_hat):
     RSS = Σ(y - y_hat)^2
     """
 
-    return hf.sum_values((y - y_hat) ** 2)
+    y = hf.as_1d_float_array(y, "y")
+    y_hat = hf.as_1d_float_array(y_hat, "y_hat")
+    return hf.sum_values(hf.power(hf.subtract(y, y_hat), 2))
 
 
 def ridge_fit(X, y, lam=1.0):
@@ -29,6 +33,9 @@ def ridge_fit(X, y, lam=1.0):
     Lưu ý:
     Không regularize intercept.
     """
+
+    X = hf.as_2d_float_array(X, "X")
+    y = hf.as_1d_float_array(y, "y")
 
     # n = số samples
     # p = số features
@@ -44,7 +51,11 @@ def ridge_fit(X, y, lam=1.0):
     # Dùng solver tuyến tính thay vì inv() để ổn định số hơn
     # khi ma trận (X^T X + λI) gần singular.
     # solve(A, b) tính A^{-1} b mà không cần tính nghịch đảo tường minh.
-    beta = hf.solve(X.T @ X + lam * I, X.T @ y)
+    XT = hf.transpose(X)
+    beta = hf.solve(
+        hf.add(hf.matmul(XT, X), hf.scalar_multiply(I, lam)),
+        hf.matmul(XT, y),
+    )
 
     return beta
 
@@ -90,6 +101,8 @@ def lasso_fit(X, y, lam=1.0, max_iter=1000, tol=1e-4):
     => Tương đương khi α_sklearn = λ / (2 * n)
     """
 
+    X = hf.as_2d_float_array(X, "X")
+    y = hf.as_1d_float_array(y, "y")
     n, p = X.shape
 
     # Khởi tạo beta ban đầu = 0
@@ -99,7 +112,7 @@ def lasso_fit(X, y, lam=1.0, max_iter=1000, tol=1e-4):
 
     # Tính trước chuẩn bình phương của các cột (z_j = X_j^T X_j)
     # Tránh tính toán lại nhiều lần trong loop
-    z = hf.sum_values(X ** 2, axis=0)
+    z = hf.sum_values(hf.power(X, 2), axis=0)
     # Tránh chia cho 0 nếu cột toàn 0
     z = hf.where(z == 0, 1e-12, z)
 
@@ -116,9 +129,10 @@ def lasso_fit(X, y, lam=1.0, max_iter=1000, tol=1e-4):
             beta_old_j = beta[j]
 
             # Loại bỏ contribution hiện tại của feature j khỏi y_predict
-            val_j = y_predict - X[:, j] * beta_old_j
-            residual = y - val_j
-            rho = X[:, j] @ residual
+            x_j = hf.column(X, j)
+            val_j = hf.subtract(y_predict, hf.scalar_multiply(x_j, beta_old_j))
+            residual = hf.subtract(y, val_j)
+            rho = hf.dot(x_j, residual)
 
             # Không regularize intercept (j = 0)
             if j == 0:
@@ -128,7 +142,10 @@ def lasso_fit(X, y, lam=1.0, max_iter=1000, tol=1e-4):
 
             # Cập nhật y_predict nếu beta_j thay đổi
             if beta[j] != beta_old_j:
-                y_predict += X[:, j] * (beta[j] - beta_old_j)
+                y_predict = hf.add(
+                    y_predict,
+                    hf.scalar_multiply(x_j, beta[j] - beta_old_j),
+                )
 
         # Nếu beta gần như không đổi nữa
         # thì model đã hội tụ
@@ -148,6 +165,7 @@ def vif(X):
 
     # n = số samples
     # p = số features
+    X = hf.as_2d_float_array(X, "X")
     n, p = X.shape
 
     # List lưu VIF của từng feature
@@ -157,7 +175,7 @@ def vif(X):
     for j in range(p):
 
         # Chọn feature hiện tại làm target
-        y_j = X[:, j]
+        y_j = hf.column(X, j)
 
         # Xóa feature j khỏi dataset
         # để dùng các feature còn lại predict nó
@@ -167,8 +185,9 @@ def vif(X):
             # Fit OLS:
             # X_rest -> y_j
             # Thay thế lstsq bằng solver tuyến tính để tuân thủ Constraint 1
-            XTX = X_rest.T @ X_rest
-            XTy = X_rest.T @ y_j
+            XT = hf.transpose(X_rest)
+            XTX = hf.matmul(XT, X_rest)
+            XTy = hf.matmul(XT, y_j)
             beta = hf.solve(XTX, XTy)
 
             # Prediction của feature j
@@ -176,8 +195,8 @@ def vif(X):
 
             # Tính R^2
             r2 = 1 - (
-                hf.sum_values((y_j - y_hat) ** 2)
-                / hf.sum_values((y_j - hf.mean(y_j)) ** 2)
+                hf.sum_values(hf.power(hf.subtract(y_j, y_hat), 2))
+                / hf.sum_values(hf.power(hf.subtract(y_j, hf.mean(y_j)), 2))
             )
 
             # Tránh chia cho 0 nếu R^2 ≈ 1
@@ -221,7 +240,7 @@ if __name__ == "__main__":
 
     # Sinh target y
     # thêm noise để giống dữ liệu thực tế
-    y = X @ true_beta + hf.random_randn(100)
+    y = hf.add(hf.matmul(X, true_beta), hf.random_randn(100))
 
     # =========================
     # CUSTOM IMPLEMENTATION
