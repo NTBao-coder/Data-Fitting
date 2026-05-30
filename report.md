@@ -93,16 +93,26 @@ Trong các biến này, ta chọn **biến mục tiêu** là **Salary** – Lư�
    train_df = df.sample(frac=0.8, random_state=42)
    test_df = df.drop(train_df.index)
    ```
-   - Trong file `test_pipeline.py`, nhận 2 mảnh **Train** và **Test** từ vừa truyền vào, sau đó thực hiên fit và transform 2 mảnh dữ liệu này bằng cách gọi lần lượt các hàm trong class `NBADataPipeline`.
+   - Trong file `data_pipeline.py`, nhận 2 mảnh **Train** và **Test** từ vừa truyền vào, sau đó thực hiên fit và transform 2 mảnh dữ liệu này bằng cách gọi lần lượt các hàm trong class `NBADataPipeline`.
    ```python
    pipeline = NBADataPipeline()
    X_train, y_train, X_test, y_test = pipeline.process_pipeline(train_df, test_df)
    ```
 
-**2.4.2.** **Chuẩn hóa dữ liệu**
-- Mục đích: Giúp dữ liệu đảm bảo tính nhất quán và toàn vẹn. Ngoài ra, chuẩn hóa dữ liệu còn giúp thuật toán K-NN sau này hoạt động đúng và hiệu quả.
-- Thiết lập: 
+**2.4.2.** **Encode dữ liệu chuỗi**
+- Mục đích: Xử lý các biến có dữ liệu dạng chuỗi, mã hóa chúng về dạng số để mô hình có thể hiểu và xử lý được. (Ví dụ: Trong 'Position', vị trí PG sẽ được mã hóa thành 0, SG thành 1, C thành 2...)
+- Thiết lập: Trong file `data_pipeline.py`:
+  - Về phía hàm fit(): Mô hình sẽ được dạy bằng cách học cách mã hóa các cột có chứa dữ liệu là kiểu chuỗi thành các cột nhị phân chứa giá trị 0 hoặc 1 (tạo biến Dummy). Cầu thủ thuộc đội nào thì cột tương ứng với đội đó sẽ nhận giá trị là 1 và các cột khác nhận giá trị 0.
+  - Về phía hàm transform(): Test "kiến thức" mã hóa mà mô hình đã được học. Các đội bóng được mã hóa như thế nào thông qua hàm fit(), thì qua hàm transform(), các đội bóng tương ứng cũng sẽ được mã hóa tương tự như vậy.
+  Tuy nhiên, sẽ có conflict xảy ra: Tập Train không chứa tất cả các tên đội -> Team sẽ có các tên đội lạ -> không thể mã hóa được các cột tương ứng -> Gây ra lỗi.
+  Để khắc phục, nhóm dùng hàm reindex() tái chỉ số các cột chưa có chỉ số, dựa vào danh sách đội bóng gốc, ép bảng dữ liệu của Test phải định hình lại sao cho có đầy đủ tất cả các đội bóng như danh sách.
+  Nếu các cột này bị lỗi -> Cơ chế xử lý lỗi giúp tạo một cột phụ, và điền số 0 cho toàn bộ, tránh việc gây lỗi hệ thống, mô hình vẫn chạy bình thường.
 
+**2.4.3.** **Chuẩn hóa**
+- Mục đích: Giúp đưa các biến về cùng một thang đo, giảm thiểu ảnh hưởng của các biến có giá trị lớn, đảm bảo tính nhất quán và cho các dữ liệu tuân theo một quy tắc nhất định.
+- Thiết lập:
+   - Tại hàm fit(): Tính toán giá trị trung bình (mean) và độ lệch chuẩn (std) cho từng biến số. Sau đó, áp dụng công thức chuẩn hóa Z-score.
+   - Tại hàm transform(): Áp dụng giá trị trung bình và độ lệch chuẩn đã tính ở trên cho tập Test.
 
 
     

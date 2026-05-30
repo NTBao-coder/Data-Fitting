@@ -136,20 +136,22 @@ def monte_carlo_gauss_markov(
     if n_samples <= n_features:
         raise ValueError("n_samples must be greater than len(true_beta).")
 
-    non_intercept_features = hf.random_normal(
-        loc=0.0,
-        scale=1.0,
-        size=(n_simulations, n_samples, n_features - 1),
-    )
-    intercept = hf.ones((n_simulations, n_samples, 1), dtype=float)
-    X = hf.concatenate([intercept, non_intercept_features], axis=2)
-    epsilon = hf.random_normal(loc=0.0, scale=1.0, size=(n_simulations, n_samples))
-    y = X @ true_beta + epsilon
+    beta_hats_list = []
+    for _ in range(n_simulations):
+        if n_features > 1:
+            non_intercept = hf.random_normal(loc=0.0, scale=1.0, size=(n_samples, n_features - 1))
+            intercept = hf.ones((n_samples, 1), dtype=float)
+            X = hf.concatenate([intercept, non_intercept], axis=1)
+        else:
+            X = hf.ones((n_samples, 1), dtype=float)
+            
+        epsilon = hf.random_normal(loc=0.0, scale=1.0, size=n_samples)
+        y = X @ true_beta + epsilon
+        
+        beta_hat = hf.solve(X.T @ X, X.T @ y)
+        beta_hats_list.append(beta_hat)
 
-    XT = hf.swapaxes(X, 1, 2)
-    XTX = XT @ X
-    XTy = XT @ y[..., None]
-    beta_hats = (hf.inverse(XTX) @ XTy).squeeze(axis=2)
+    beta_hats = hf.Matrix(beta_hats_list)
 
     beta_mean = beta_hats.mean(axis=0)
     beta_bias = beta_mean - true_beta

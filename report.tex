@@ -98,4 +98,54 @@ $\rightarrow$ Kết luận: Việc đưa biến mục tiêu (Salary) về dạng
     \end{itemize}
 \end{itemize}
 
-\textbf{2.3. Tiền xử lý dữ liệu:}
+\textbf{2.4. Tiền xử lý dữ liệu}
+
+\textbf{2.4.1. Chia Train/Test từ dữ liệu}
+\begin{itemize}
+    \item Mục đích: Chia dữ liệu ra thành 2 tập \textbf{Train} và \textbf{Test}. 
+    \begin{itemize}
+        \item Tập \textbf{Train} mang nhiệm vụ "dạy" cho mô hình để tìm ra các quy luật, hệ số, đường xu hướng; đánh giá mức độ ảnh hưởng của các biến lên biến mục tiêu; đánh giá độ phù hợp của mô hình với dữ liệu. 
+        \item Tập \textbf{Test} có được giấu đi trong quá trình huấn luyện. Sau khi mô hình học xong, ta sẽ đưa tập \textbf{Test} vào để kiểm thử khả năng dự đoán, tổng quát hoá của mô hình với dữ liệu, đánh giá xem mô hình có đúng với thực tế hay không.
+        \item Nếu không chia ra thành 2 tập khác biệt, mô hình sẽ có hiện tượng Overfitting: mô hình chỉ học thuộc các dữ liệu đã train, không thể hoặc có hiệu suất kém trong việc xử lý dữ liệu mới chưa từng gặp.
+        \item Ngoài ra, cần đặt \textbf{random seed} để có thể chia dữ liệu 1 cách ngẫu nhiên, từ đó đảm bảo tính khách quan và tái lặp kết quả. Để có thể tái lập lại kết quả, nhóm đã thiết lập seed = 42 và dùng nó trong tất cả các bước xử lý dữ liệu và xây dựng mô hình.
+    \end{itemize}
+    \item Thiết lập:
+    \begin{itemize}
+        \item Trong file \texttt{part2\_notebook.ipynb}, chia dữ liệu ra làm 2 tập \textbf{Train} (80\%) và \textbf{Test} (20\%) thông qua hàm \texttt{sample()}, và đặt \textbf{random\_seed = 42}.
+\begin{verbatim}
+train_df = df.sample(frac=0.8, random_state=42)
+test_df = df.drop(train_df.index)
+\end{verbatim}
+        \item Trong file \texttt{data\_pipeline.py}, nhận 2 mảnh \textbf{Train} và \textbf{Test} vừa truyền vào, sau đó thực hiện fit và transform 2 mảnh dữ liệu này bằng cách gọi lần lượt các hàm trong class \texttt{NBADataPipeline}.
+\begin{verbatim}
+pipeline = NBADataPipeline()
+X_train, y_train, X_test, y_test = pipeline.process_pipeline(train_df, test_df)
+\end{verbatim}
+    \end{itemize}
+\end{itemize}
+
+\textbf{2.4.2. Encode dữ liệu chuỗi}
+\begin{itemize}
+    \item Mục đích: Xử lý các biến có dữ liệu dạng chuỗi, mã hóa chúng về dạng số để mô hình có thể hiểu và xử lý được. (Ví dụ: Trong 'Position', vị trí PG sẽ được mã hóa thành 0, SG thành 1, C thành 2...)
+    \item Thiết lập: Trong file \texttt{data\_pipeline.py}:
+    \begin{itemize}
+        \item Về phía hàm \texttt{fit()}: Mô hình sẽ được dạy bằng cách học cách mã hóa các cột có chứa dữ liệu là kiểu chuỗi thành các cột nhị phân chứa giá trị 0 hoặc 1 (tạo biến Dummy). Cầu thủ thuộc đội nào thì cột tương ứng với đội đó sẽ nhận giá trị là 1 và các cột khác nhận giá trị 0.
+        \item Về phía hàm \texttt{transform()}: Test "kiến thức" mã hóa mà mô hình đã được học. Các đội bóng được mã hóa như thế nào thông qua hàm \texttt{fit()}, thì qua hàm \texttt{transform()}, các đội bóng tương ứng cũng sẽ được mã hóa tương tự như vậy.
+        
+        Tuy nhiên, sẽ có conflict xảy ra: Tập Train không chứa tất cả các tên đội $\rightarrow$ Team sẽ có các tên đội lạ $\rightarrow$ không thể mã hóa được các cột tương ứng $\rightarrow$ Gây ra lỗi.
+        
+        Để khắc phục, nhóm dùng hàm \texttt{reindex()} tái chỉ số các cột chưa có chỉ số, dựa vào danh sách đội bóng gốc, ép bảng dữ liệu của Test phải định hình lại sao cho có đầy đủ tất cả các đội bóng như danh sách.
+        
+        Nếu các cột này bị lỗi $\rightarrow$ Cơ chế xử lý lỗi giúp tạo một cột phụ, và điền số 0 cho toàn bộ, tránh việc gây lỗi hệ thống, mô hình vẫn chạy bình thường.
+    \end{itemize}
+\end{itemize}
+
+\textbf{2.4.3. Chuẩn hóa}
+\begin{itemize}
+    \item Mục đích: Giúp đưa các biến về cùng một thang đo, giảm thiểu ảnh hưởng của các biến có giá trị lớn, đảm bảo tính nhất quán và cho các dữ liệu tuân theo một quy tắc nhất định.
+    \item Thiết lập:
+    \begin{itemize}
+        \item Tại hàm \texttt{fit()}: Tính toán giá trị trung bình (mean) và độ lệch chuẩn (std) cho từng biến số. Sau đó, áp dụng công thức chuẩn hóa Z-score: $x_{j}^{std} = \frac{x_{j} - \overline{x_j}}{s_j}$
+        \item Tại hàm \texttt{transform()}: Áp dụng giá trị trung bình và độ lệch chuẩn đã tính ở trên cho tập Test.
+    \end{itemize}
+\end{itemize}

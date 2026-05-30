@@ -54,9 +54,13 @@ def kfold_cv(X, y, k=5, model="ols", lam=1.0):
         # Các fold còn lại là train set
         train_idx = hf.concatenate([folds[j] for j in range(k) if j != i])
 
+        # Convert indices to list of integers to be compatible with numpy arrays
+        train_idx_int = [int(idx) for idx in train_idx]
+        val_idx_int = [int(idx) for idx in val_idx]
+
         # Tách train / validation
-        X_train, y_train = X[train_idx], y[train_idx]
-        X_val,   y_val   = X[val_idx],   y[val_idx]
+        X_train, y_train = X[train_idx_int], y[train_idx_int]
+        X_val,   y_val   = X[val_idx_int],   y[val_idx_int]
 
         # Train model theo loại được chọn
         if model == "ols":
