@@ -86,73 +86,54 @@ def soft_threshold(rho, lam):
 
 def lasso_fit(X, y, lam=1.0, max_iter=1000, tol=1e-4):
     """
-    Lasso Regression bằng Coordinate Descent.
-
-    Lasso sử dụng L1 regularization:
-        RSS + λΣ|beta|
-
-    Đặc điểm:
-    Có khả năng đưa coefficient về đúng 0
-    -> tự động chọn feature.
-
-    Lưu ý về convention:
-    Implementation này minimize: RSS + λ|β|
-    sklearn Lasso minimize: (1/2n) * RSS + α|β|
-    => Tương đương khi α_sklearn = λ / (2 * n)
+    Lasso Regression bằng Coordinate Descent (Tối ưu hóa tốc độ).
     """
-
     X = hf.as_2d_float_array(X, "X")
     y = hf.as_1d_float_array(y, "y")
     n, p = X.shape
 
-    # Khởi tạo beta ban đầu = 0
-    beta = hf.zeros(p)
-    # Khởi tạo vector dự đoán y_predict = X @ beta = 0
-    y_predict = hf.zeros(n)
+    # Chuyển đổi thành lists thuần túy để tính toán tốc độ cao
+    X_cols = list(zip(*X))
+    y_list = list(y)
 
-    # Tính trước chuẩn bình phương của các cột (z_j = X_j^T X_j)
-    # Tránh tính toán lại nhiều lần trong loop
-    z = hf.sum_values(hf.power(X, 2), axis=0)
-    # Tránh chia cho 0 nếu cột toàn 0
-    z = hf.where(z == 0, 1e-12, z)
+    # Khởi tạo beta và y_predict
+    beta = [0.0] * p
+    y_predict = [0.0] * n
 
-    # Lặp tối đa max_iter lần
+    # Tính chuẩn bình phương của các cột (z_j)
+    z = [sum(v * v for v in col) for col in X_cols]
+    z = [val if val != 0 else 1e-12 for val in z]
+
     for _ in range(max_iter):
+        beta_old = list(beta)
 
-        # Lưu beta cũ để kiểm tra hội tụ
-        beta_old = beta.copy()
-
-        # Coordinate Descent:
-        # cập nhật từng coefficient beta_j
         for j in range(p):
-
             beta_old_j = beta[j]
+            x_j = X_cols[j]
 
-            # Loại bỏ contribution hiện tại của feature j khỏi y_predict
-            x_j = hf.column(X, j)
-            val_j = hf.subtract(y_predict, hf.scalar_multiply(x_j, beta_old_j))
-            residual = hf.subtract(y, val_j)
-            rho = hf.dot(x_j, residual)
+            # rho = dot(x_j, y - y_predict) + beta_old_j * z[j]
+            # Tính dot product inline để tránh tạo mảng phụ (tiết kiệm bộ nhớ và thời gian)
+            dot_val = sum(x_j[i] * (y_list[i] - y_predict[i]) for i in range(n))
+            rho = dot_val + beta_old_j * z[j]
 
             # Không regularize intercept (j = 0)
             if j == 0:
-                beta[j] = hf.sum_values(residual) / z[j]
+                beta[j] = rho / z[j]
             else:
                 beta[j] = soft_threshold(rho, lam) / z[j]
 
-            # Cập nhật y_predict nếu beta_j thay đổi
-            if beta[j] != beta_old_j:
-                y_predict = hf.add(
-                    y_predict,
-                    hf.scalar_multiply(x_j, beta[j] - beta_old_j),
-                )
+            # Cập nhật y_predict tại chỗ (in-place) nếu beta_j thay đổi
+            diff = beta[j] - beta_old_j
+            if abs(diff) > 1e-12:
+                for i in range(n):
+                    y_predict[i] += diff * x_j[i]
 
-        # Nếu beta gần như không đổi nữa
-        # thì model đã hội tụ
-        if hf.norm(beta - beta_old) < tol:
+        # Kiểm tra hội tụ (dùng L2 norm)
+        diff_norm = sum((b - bo) ** 2 for b, bo in zip(beta, beta_old)) ** 0.5
+        if diff_norm < tol:
             break
 
-    return beta
+    return hf.Vector(beta)
 
 
 def vif(X):

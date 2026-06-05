@@ -1,5 +1,12 @@
 import pandas as pd
-import numpy as np
+import math
+import sys
+import os
+
+# Đảm bảo có thể import các module thuần Python từ part1
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from part1 import helper_function as hf
+from part1.ridge_lasso import vif
 
 class NBADataPipeline:
     def __init__(self, vif_threshold=10.0):
@@ -18,48 +25,60 @@ class NBADataPipeline:
 
     def _knn_impute(self, target_df, source_df, k=5):
         """
-        Điền khuyết (Imputation) bằng thuật toán K-Nearest Neighbors tự code bằng NumPy.
+        Điền khuyết (Imputation) bằng K-Nearest Neighbors thuần Python (Không dùng NumPy).
         """
         target = target_df.copy()
-        source = source_df.values
         
-        for i in range(len(target)):
-            row = target.iloc[i].values
-            missing_mask = np.isnan(row)
+        # Chuyển DataFrame sang list thuần để xử lý tốc độ cao
+        source_vals = source_df.values.tolist()
+        target_vals = target.values.tolist()
+        
+        for i in range(len(target_vals)):
+            row = target_vals[i]
             
-            if not missing_mask.any():
+            # Tìm danh sách các cột bị khuyết trong dòng này
+            missing_cols = [col_idx for col_idx, val in enumerate(row) if pd.isna(val)]
+            if not missing_cols:
                 continue
                 
-            # Tính bình phương khoảng cách
-            diff = source - row
-            diff_sq = np.nan_to_num(diff**2)
-            
-            # Số lượng thuộc tính hợp lệ (cả 2 đều không NaN)
-            valid_cols_count = np.sum(~np.isnan(source) & ~np.isnan(row), axis=1)
-            
-            with np.errstate(divide='ignore', invalid='ignore'):
-                dist = np.sqrt(np.sum(diff_sq, axis=1) / valid_cols_count)
-            
-            dist[valid_cols_count == 0] = np.inf
-            
-            for col_idx in np.where(missing_mask)[0]:
-                col_source = source[:, col_idx]
-                valid_source_mask = ~np.isnan(col_source)
+            # Tính khoảng cách Euclidean đến tất cả các dòng trong source
+            distances = []
+            for s_idx, s_row in enumerate(source_vals):
+                diff_sq_sum = 0.0
+                valid_count = 0
+                for j in range(len(row)):
+                    if not pd.isna(row[j]) and not pd.isna(s_row[j]):
+                        diff_sq_sum += (s_row[j] - row[j]) ** 2
+                        valid_count += 1
                 
-                valid_dists = dist.copy()
-                valid_dists[~valid_source_mask] = np.inf
-                
-                nearest_idx = np.argsort(valid_dists)[:k]
-                
-                if np.isinf(valid_dists[nearest_idx[0]]):
-                    target.iloc[i, col_idx] = np.nanmean(col_source)
+                if valid_count > 0:
+                    dist = math.sqrt(diff_sq_sum / valid_count)
                 else:
-                    k_nearest_vals = col_source[nearest_idx]
-                    k_nearest_vals = k_nearest_vals[~np.isinf(valid_dists[nearest_idx])]
-                    if len(k_nearest_vals) > 0:
-                        target.iloc[i, col_idx] = np.mean(k_nearest_vals)
+                    dist = float('inf')
+                distances.append(dist)
+                
+            # Điền khuyết từng cột
+            for col_idx in missing_cols:
+                # Lọc các láng giềng có giá trị hợp lệ ở cột này
+                valid_neighbors = [(distances[s_idx], source_vals[s_idx][col_idx]) 
+                                   for s_idx in range(len(source_vals)) 
+                                   if not pd.isna(source_vals[s_idx][col_idx])]
+                
+                # Sắp xếp theo khoảng cách
+                valid_neighbors.sort(key=lambda x: x[0])
+                
+                # Lấy k láng giềng gần nhất (khoảng cách khác vô cực)
+                top_k = [val for d, val in valid_neighbors[:k] if d != float('inf')]
+                
+                if top_k:
+                    target.iloc[i, col_idx] = sum(top_k) / len(top_k)
+                else:
+                    # Fallback (dùng trung bình toàn cột)
+                    col_values = [s_row[col_idx] for s_row in source_vals if not pd.isna(s_row[col_idx])]
+                    if col_values:
+                        target.iloc[i, col_idx] = sum(col_values) / len(col_values)
                     else:
-                        target.iloc[i, col_idx] = np.nanmean(col_source)
+                        target.iloc[i, col_idx] = 0.0
                         
         return target
 
@@ -91,8 +110,8 @@ class NBADataPipeline:
         """BƯỚC HỌC: Chỉ tính toán tham số từ X_train và cất vào State"""
         X = self._base_feature_engineering(X_train)
         
-        # Lọc ra danh sách biến số học thực sự
-        numeric_cols = X.select_dtypes(include=[np.number]).columns.tolist()
+        # Lọc ra danh sách biến số học thực sự (thay thế np.number bằng string 'number' của Pandas)
+        numeric_cols = X.select_dtypes(include=['number']).columns.tolist()
         self.numeric_features = [c for c in numeric_cols if c not in self.exclude_cols]
 
         X_temp = X.copy()
@@ -123,6 +142,7 @@ class NBADataPipeline:
         # Điền khuyết trên tập đã chuẩn hóa, tập Train mượn chính nó làm source
         self.train_knn_source = X_temp[self.numeric_features].copy()
         X_temp[self.numeric_features] = self._knn_impute(X_temp[self.numeric_features], self.train_knn_source, k=5)
+        
         # Cập nhật lại train_knn_source thành dữ liệu đã SẠCH BONG NaN
         self.train_knn_source = X_temp[self.numeric_features].copy()
         
@@ -131,13 +151,13 @@ class NBADataPipeline:
             self.imputation_values[col] = X_temp[col].mean()
 
         # 4. VIF (Lọc): Chỉ lọc trên các biến số (đã sạch NaN)
-        corr_matrix = X_temp[self.numeric_features].corr().values
-        corr_matrix = np.nan_to_num(corr_matrix, nan=0.0, posinf=1.0, neginf=-1.0)
-        inv_corr = np.linalg.pinv(corr_matrix) # Dùng Pseudo-inverse để an toàn
-        vifs = np.diag(inv_corr)
+        # Sử dụng thuật toán VIF thuần Python thay cho np.linalg.pinv
+        print("Đang chạy VIF thuần Python để lọc đa cộng tuyến...")
+        X_vif_input = hf.Matrix([hf.Vector(row) for row in X_temp[self.numeric_features].values.tolist()])
+        vifs = vif(X_vif_input)
         
         self.vif_passed_features = [
-            col for col, vif in zip(self.numeric_features, vifs) if vif <= self.vif_threshold
+            col for col, v in zip(self.numeric_features, vifs) if v <= self.vif_threshold
         ]
 
         self.is_fitted = True
@@ -172,12 +192,11 @@ class NBADataPipeline:
                 X_out[col] = X_out[col].fillna(self.imputation_values[col])
 
         # 4. Lọc cột số và lắp ráp ma trận cuối cùng
-        # Chỉ lấy các biến số học đã pass VIF + toàn bộ biến Dummy
         X_final = pd.concat([X_out[self.vif_passed_features], X_dummy], axis=1)
         
-        # Xử lý biến mục tiêu (Nếu có)
+        # Xử lý biến mục tiêu (Nếu có) bằng math.log thay cho np.log
         if 'Salary' in X.columns:
-            X_final['Log_Salary'] = np.log(X['Salary'])
+            X_final['Log_Salary'] = X['Salary'].apply(math.log)
             
         return X_final
 

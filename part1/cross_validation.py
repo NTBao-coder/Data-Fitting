@@ -58,9 +58,11 @@ def kfold_cv(X, y, k=5, model="ols", lam=1.0):
         train_idx_int = [int(idx) for idx in train_idx]
         val_idx_int = [int(idx) for idx in val_idx]
 
-        # Tách train / validation
-        X_train, y_train = X[train_idx_int], y[train_idx_int]
-        X_val,   y_val   = X[val_idx_int],   y[val_idx_int]
+        # Tách train / validation (sử dụng list comprehension thay vì array indexing do đã bỏ Numpy)
+        X_train = hf.Matrix([X[idx] for idx in train_idx_int])
+        y_train = hf.Vector([y[idx] for idx in train_idx_int])
+        X_val   = hf.Matrix([X[idx] for idx in val_idx_int])
+        y_val   = hf.Vector([y[idx] for idx in val_idx_int])
 
         # Train model theo loại được chọn
         if model == "ols":
@@ -78,12 +80,13 @@ def kfold_cv(X, y, k=5, model="ols", lam=1.0):
         # Dự đoán trên validation set
         y_hat = predict(X_val, beta)
 
-        # Tính MSE của fold này
-        mse = hf.mean((y_val - y_hat) ** 2)
+        # Tính MSE của fold này thủ công
+        diff = y_val - y_hat
+        mse = sum(v**2 for v in diff) / len(diff)
         fold_mses.append(mse)
 
     # CV score = trung bình MSE qua tất cả k folds
-    cv_score = hf.mean(fold_mses)
+    cv_score = sum(fold_mses) / len(fold_mses)
 
     return cv_score, fold_mses
 

@@ -255,7 +255,7 @@ def dot(left: Any, right: Any) -> float:
     right = as_1d_float_array(right, "right")
     if len(left) != len(right):
         raise ValueError("Vectors must have the same length.")
-    return sum(a * b for a, b in zip(left, right))
+    return sum([a * b for a, b in zip(left, right)])
 
 
 def matmul(left: Any, right: Any) -> Any:
@@ -272,23 +272,25 @@ def matmul(left: Any, right: Any) -> Any:
         vector = as_1d_float_array(right, "right")
         if matrix.shape[1] != len(vector):
             raise ValueError("Matrix columns must match vector length.")
-        return Vector([dot(row, vector) for row in matrix])
+        return Vector([sum([a * b for a, b in zip(row, vector)]) for row in matrix])
 
     if not left_is_matrix and right_is_matrix:
         vector = as_1d_float_array(left, "left")
         matrix = as_2d_float_array(right, "right")
         if len(vector) != matrix.shape[0]:
             raise ValueError("Vector length must match matrix rows.")
-        return Vector([dot(vector, column(matrix, j)) for j in range(matrix.shape[1])])
+        right_t = list(zip(*matrix))
+        return Vector([sum([a * b for a, b in zip(vector, col)]) for col in right_t])
 
     left_matrix = as_2d_float_array(left, "left")
     right_matrix = as_2d_float_array(right, "right")
     if left_matrix.shape[1] != right_matrix.shape[0]:
         raise ValueError("Left columns must match right rows.")
-    right_t = transpose(right_matrix)
+    
+    right_t = list(zip(*right_matrix))
     return Matrix(
         [
-            Vector([dot(left_row, right_col) for right_col in right_t])
+            Vector([sum([a * b for a, b in zip(left_row, right_col)]) for right_col in right_t])
             for left_row in left_matrix
         ]
     )
@@ -313,29 +315,38 @@ def solve(matrix: Any, values: Any) -> Any:
     rhs_width = rhs_matrix.shape[1]
 
     for pivot_idx in range(n_rows):
-        pivot_row = max(
-            range(pivot_idx, n_rows), key=lambda row: abs(augmented[row][pivot_idx])
-        )
-        if is_close(augmented[pivot_row][pivot_idx], 0.0, atol=1e-12):
-            raise LinAlgError("Matrix is singular.")
-        if pivot_row != pivot_idx:
-            augmented[pivot_idx], augmented[pivot_row] = augmented[pivot_row], augmented[pivot_idx]
+        pivot_row = pivot_idx
+        max_val = abs(list.__getitem__(augmented, pivot_idx)[pivot_idx])
+        for r in range(pivot_idx + 1, n_rows):
+            val = abs(list.__getitem__(augmented, r)[pivot_idx])
+            if val > max_val:
+                max_val = val
+                pivot_row = r
 
-        pivot = augmented[pivot_idx][pivot_idx]
-        augmented[pivot_idx] = Vector([value / pivot for value in augmented[pivot_idx]])
+        if max_val < 1e-12:
+            raise LinAlgError("Matrix is singular.")
+            
+        if pivot_row != pivot_idx:
+            tmp = list.__getitem__(augmented, pivot_row)
+            list.__setitem__(augmented, pivot_row, list.__getitem__(augmented, pivot_idx))
+            list.__setitem__(augmented, pivot_idx, tmp)
+
+        pivot_row_vals = list.__getitem__(augmented, pivot_idx)
+        pivot = pivot_row_vals[pivot_idx]
+        for c in range(pivot_idx, len(pivot_row_vals)):
+            pivot_row_vals[c] /= pivot
 
         for row_idx in range(n_rows):
             if row_idx == pivot_idx:
                 continue
-            factor = augmented[row_idx][pivot_idx]
-            if is_close(factor, 0.0, atol=1e-15):
+                
+            row_to_update = list.__getitem__(augmented, row_idx)
+            factor = row_to_update[pivot_idx]
+            if abs(factor) < 1e-15:
                 continue
-            augmented[row_idx] = Vector(
-                [
-                    value - factor * pivot_value
-                    for value, pivot_value in zip(augmented[row_idx], augmented[pivot_idx])
-                ]
-            )
+                
+            for c in range(pivot_idx, len(row_to_update)):
+                row_to_update[c] -= factor * pivot_row_vals[c]
 
     solution = Matrix([Vector(row[-rhs_width:]) for row in augmented])
     if rhs_is_matrix:

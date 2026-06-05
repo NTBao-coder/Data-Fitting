@@ -89,7 +89,7 @@ def residual_plots(
     axes[1, 0].set_xlabel("Fitted values")
     axes[1, 0].set_ylabel("sqrt(|standardized residuals|)")
 
-    axes[1, 1].stem(observation_index, cooks_distance, markerfmt=",")
+    axes[1, 1].stem(list(observation_index), list(cooks_distance), markerfmt=",")
     axes[1, 1].set_title("Cook's Distance")
     axes[1, 1].set_xlabel("Observation index")
     axes[1, 1].set_ylabel("Cook's distance")

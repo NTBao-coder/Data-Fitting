@@ -114,6 +114,14 @@ Trong các biến này, ta chọn **biến mục tiêu** là **Salary** – Lư�
    - Tại hàm fit(): Tính toán giá trị trung bình (mean) và độ lệch chuẩn (std) cho từng biến số. Sau đó, áp dụng công thức chuẩn hóa Z-score.
    - Tại hàm transform(): Áp dụng giá trị trung bình và độ lệch chuẩn đã tính ở trên cho tập Test.
 
+**2.4.4.** **Xử lý Missing Values**
+- Mục đích: Điền các thông số còn khuyết thiếu của dữ liệu.
+- Thiết lập:
+   - Thuật toán: Cần phải chọn một thuật toán hợp lý để xử lý Missing Values.
+     - Listwise deletion: Xóa toàn bộ hàng bị khuyết dữ liệu -> Mất dữ liệu, lãng phí tài nguyên, làm mô hình hoạt động không tốt.
+     - 
+
+
 
     
   
