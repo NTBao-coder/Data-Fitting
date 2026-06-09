@@ -25,7 +25,7 @@ class NBADataPipeline:
 
     def _knn_impute(self, target_df, source_df, k=5):
         """
-        Điền khuyết (Imputation) bằng K-Nearest Neighbors thuần Python (Không dùng NumPy).
+        Điền dữ liệu khuyết bằng K-Nearest Neighbors thuần Python.
         """
         target = target_df.copy()
         
@@ -83,7 +83,7 @@ class NBADataPipeline:
         return target
 
     def _base_feature_engineering(self, df):
-        """Bước 0: Tạo biến mới độc lập (Không gây Data Leakage vì tính trên từng dòng)"""
+        """Bước 0: Tạo biến mới độc lập"""
         X = df.copy()
         
         # 1. Advanced Metrics (TS%)
@@ -150,15 +150,33 @@ class NBADataPipeline:
         for col in self.numeric_features:
             self.imputation_values[col] = X_temp[col].mean()
 
-        # 4. VIF (Lọc): Chỉ lọc trên các biến số (đã sạch NaN)
-        # Sử dụng thuật toán VIF thuần Python thay cho np.linalg.pinv
-        print("Đang chạy VIF thuần Python để lọc đa cộng tuyến...")
+        # 4. VIF (Lọc tuần tự): Chỉ lọc trên các biến số
+        print("Đang chạy VIF tuần tự để lọc đa cộng tuyến...")
         X_vif_input = hf.Matrix([hf.Vector(row) for row in X_temp[self.numeric_features].values.tolist()])
-        vifs = vif(X_vif_input)
+        current_features = list(self.numeric_features)
         
-        self.vif_passed_features = [
-            col for col, v in zip(self.numeric_features, vifs) if v <= self.vif_threshold
-        ]
+        while True:
+            vif_vals = vif(X_vif_input)
+            
+            max_idx = 0
+            max_vif = vif_vals[0]
+            for idx, val in enumerate(vif_vals):
+                if val > max_vif:
+                    max_vif = val
+                    max_idx = idx
+            
+            if max_vif > self.vif_threshold and max_vif != hf.INF:
+                dropped = current_features.pop(max_idx)
+                X_vif_input = hf.delete(X_vif_input, max_idx, axis=1)
+                print(f"  -> Loại bỏ '{dropped}' (VIF = {max_vif:.2f})")
+            elif max_vif == hf.INF:
+                dropped = current_features.pop(max_idx)
+                X_vif_input = hf.delete(X_vif_input, max_idx, axis=1)
+                print(f"  -> Loại bỏ '{dropped}' (VIF = INF)")
+            else:
+                break
+                
+        self.vif_passed_features = current_features
 
         self.is_fitted = True
 
