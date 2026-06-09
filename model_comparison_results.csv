@@ -1,0 +1,7 @@
+﻿Mô hình,MAE (USD),RMSE (USD),R2 Score,Ghi chú/Siêu tham số
+OLS Cơ Bản,"12,030,392.95","66,705,305.98",-46.1259,Mặc định
+OLS Chọn Biến,"4,391,446.17","8,049,736.54",0.3137,8 đặc trưng
+Polynomial Regression,"8,379,110.88","36,213,306.85",-12.8891,Lambda=1.0
+Ridge Regression,"9,021,788.98","42,309,317.08",-17.9588,Lambda=1.0
+Lasso Regression,"6,034,862.01","17,243,449.01",-2.1491,Lambda=1.0
+Bayesian Regression,"9,021,788.98","42,309,317.08",-17.9588,Mặc định
